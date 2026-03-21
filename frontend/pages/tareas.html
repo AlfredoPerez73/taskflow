@@ -1,0 +1,47 @@
+<div class="pantalla" id="pantalla-tareas">
+  <div class="page-wrap">
+    <div class="page-head">
+      <div>
+        <div class="page-title">Tareas</div>
+        <div class="page-desc">Gestión y seguimiento de tareas</div>
+      </div>
+      <div class="flex">
+        <select
+          class="fselect"
+          id="selTareasProy"
+          style="width: 200px; padding: 6px 10px"
+          onchange="cargarTareasPaginadas(this.value, 1)"
+        >
+          <option value="">— Proyecto —</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="abrirModalTarea()">
+          <i class="ph ph-plus"></i> Nueva
+        </button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tabla-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Tipo</th>
+              <th>Prioridad</th>
+              <th>Responsables</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbTareas">
+            <tr>
+              <td colspan="6" class="vacío">
+                Selecciona un proyecto para ver las tareas
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="pagTareas"></div>
+    </div>
+  </div>
+</div>

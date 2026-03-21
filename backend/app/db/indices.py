@@ -1,0 +1,25 @@
+from app.db.conexion import ConexionMongoDB
+
+
+async def crear_indices() -> None:
+    db = ConexionMongoDB.obtener_instancia().obtener_base_datos()
+
+    await db["usuarios"].create_index("email", unique=True)
+    await db["usuarios"].create_index("_id")
+
+    await db["proyectos"].create_index("propietarioId")
+    await db["proyectos"].create_index("estado")
+
+    await db["tableros"].create_index("proyectoId")
+
+    await db["tareas"].create_index("columnaId")
+    await db["tareas"].create_index("proyectoId")
+    await db["tareas"].create_index([("titulo", "text"), ("descripcion", "text")])
+
+    await db["notificaciones"].create_index("usuarioId")
+    await db["notificaciones"].create_index("leida")
+
+    await db["registros_auditoria"].create_index("proyectoId")
+    await db["registros_auditoria"].create_index("usuarioId")
+
+    await db["filtros_guardados"].create_index([("usuarioId", 1), ("proyectoId", 1)])

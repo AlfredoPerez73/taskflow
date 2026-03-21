@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="es" data-tema="oscuro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNWI1MmU4Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGI4M2ZmIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjE2IiB5PSIyMiIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtd2VpZ2h0PSI4MDAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5URjwvdGV4dD48L3N2Zz4="
+    />
+    <!-- Fuentes -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <!-- React Icons via CDN (Phosphor Icons — iconset moderno) -->
+    <script
+      src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js"
+      defer
+    ></script>
+    <link rel="stylesheet" href="css/estilos.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar-logo">
+          <div class="topbar-logo-icon">TF</div>
+          TaskFlow
+        </div>
+        <div class="topbar-sep" id="topSep" style="display: none"></div>
+        <span id="topBreadcrumb" style="display: none"></span>
+        <div class="topbar-right">
+          <button
+            class="btn-tema"
+            id="btnTema"
+            onclick="toggleTema()"
+            title="Cambiar tema"
+          >
+            <i class="ph ph-sun"></i>
+          </button>
+          <div
+            class="topbar-notif"
+            id="btnNotif"
+            onclick="mostrarPantalla('notificaciones')"
+            style="display: none"
+            title="Notificaciones"
+          >
+            <i class="ph ph-bell"></i>
+            <span class="notif-badge" id="badgeNotif">0</span>
+          </div>
+          <div class="topbar-usuario" id="topUsuario" style="display: none">
+            <div
+              class="avatar"
+              id="topAvatar"
+              style="width: 22px; height: 22px; font-size: 9px"
+            >
+              --
+            </div>
+            <span id="topNombre"></span>
+            <span id="topRolBadge" class="badge bm"></span>
+          </div>
+          <button
+            class="btn-salir"
+            id="btnSalir"
+            onclick="cerrarSesion()"
+            style="display: none"
+          >
+            <i class="ph ph-sign-out"></i> Salir
+          </button>
+        </div>
+      </header>
+
+      <!-- SIDEBAR -->
+      <nav class="sidebar" id="sidebar" style="display: none">
+        <div class="nav-section">
+          <div class="nav-label">Principal</div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('dashboard')"
+            data-p="dashboard"
+          >
+            <span class="nav-ico"><i class="ph ph-squares-four"></i></span>
+            Dashboard
+          </div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('proyectos')"
+            data-p="proyectos"
+          >
+            <span class="nav-ico"><i class="ph ph-folder"></i></span>
+            Proyectos
+          </div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('tablero')"
+            data-p="tablero"
+          >
+            <span class="nav-ico"><i class="ph ph-kanban"></i></span>
+            Tablero Kanban
+          </div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('tareas')"
+            data-p="tareas"
+          >
+            <span class="nav-ico"><i class="ph ph-check-square"></i></span>
+            Tareas
+          </div>
+        </div>
+
+        <div class="nav-sep"></div>
+
+        <div class="nav-section">
+          <div class="nav-label">Gestión</div>
+          <div
+            class="nav-item"
+            id="navUsuarios"
+            onclick="mostrarPantalla('usuarios')"
+            data-p="usuarios"
+            style="display: none"
+          >
+            <span class="nav-ico"><i class="ph ph-users"></i></span>
+            Usuarios
+          </div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('reportes')"
+            data-p="reportes"
+          >
+            <span class="nav-ico"><i class="ph ph-chart-bar"></i></span>
+            Reportes
+          </div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('historial')"
+            data-p="historial"
+          >
+            <span class="nav-ico"><i class="ph ph-clock-clockwise"></i></span>
+            Historial
+          </div>
+          <div
+            class="nav-item"
+            id="navRegistrar"
+            onclick="mostrarPantalla('registro')"
+            data-p="registro"
+            style="display: none"
+          >
+            <span class="nav-ico"><i class="ph ph-user-plus"></i></span>
+            Crear usuario
+          </div>
+        </div>
+
+        <div class="nav-sep"></div>
+
+        <div class="nav-section">
+          <div class="nav-label">Cuenta</div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('perfil')"
+            data-p="perfil"
+          >
+            <span class="nav-ico"><i class="ph ph-user-circle"></i></span>
+            Mi perfil
+          </div>
+          <div
+            class="nav-item"
+            id="navNotificaciones"
+            onclick="mostrarPantalla('notificaciones')"
+            data-p="notificaciones"
+          >
+            <span class="nav-ico"><i class="ph ph-bell-simple"></i></span>
+            Notificaciones
+          </div>
+        </div>
+      </nav>
+
+      <!-- PANTALLAS -->
+      <main id="contenido">
+        <div id="slot-login"></div>
+        <div id="slot-dashboard"></div>
+        <div id="slot-proyectos"></div>
+        <div id="slot-tablero"></div>
+        <div id="slot-tareas"></div>
+        <div id="slot-usuarios"></div>
+        <div id="slot-registro"></div>
+        <div id="slot-reportes"></div>
+        <div id="slot-historial"></div>
+        <div id="slot-notificaciones"></div>
+        <div id="slot-perfil"></div>
+      </main>
+    </div>
+
+    <!-- MODALES -->
+    <div class="overlay" id="mProy">
+      <div class="modal">
+        <div class="modal-t">
+          <i class="ph ph-folder-plus" style="color: var(--a)"></i> Nuevo
+          proyecto
+        </div>
+        <div class="fg">
+          <label class="flabel">Nombre</label>
+          <input class="finput" id="pNom" placeholder="Nombre del proyecto" />
+        </div>
+        <div class="fg">
+          <label class="flabel">Descripción</label>
+          <textarea
+            class="ftextarea"
+            id="pDesc"
+            placeholder="Descripción opcional..."
+          ></textarea>
+        </div>
+        <div class="frow">
+          <div class="fg">
+            <label class="flabel">Fecha inicio</label>
+            <input class="finput" id="pFI" type="date" />
+          </div>
+          <div class="fg">
+            <label class="flabel">Fecha fin estimada</label>
+            <input class="finput" id="pFF" type="date" />
+          </div>
+        </div>
+        <div class="ferror" id="pError"></div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="cerrarModal('mProy')">
+            Cancelar
+          </button>
+          <button class="btn btn-primary" onclick="crearProyecto()">
+            <i class="ph ph-plus"></i> Crear proyecto
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="mTarea">
+      <div class="modal">
+        <div class="modal-t">
+          <i class="ph ph-plus-circle" style="color: var(--a)"></i> Nueva tarea
+        </div>
+        <div class="fg">
+          <label class="flabel">Título</label>
+          <input class="finput" id="tTit" placeholder="Título de la tarea" />
+        </div>
+        <div class="fg">
+          <label class="flabel">Descripción</label>
+          <textarea
+            class="ftextarea"
+            id="tDesc"
+            placeholder="Descripción opcional..."
+          ></textarea>
+        </div>
+        <div class="frow">
+          <div class="fg">
+            <label class="flabel">Tipo</label>
+            <select class="fselect" id="tTipo">
+              <option value="TASK">Task</option>
+              <option value="BUG">Bug</option>
+              <option value="FEATURE">Feature</option>
+              <option value="IMPROVEMENT">Improvement</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="flabel">Prioridad</label>
+            <select class="fselect" id="tPrio">
+              <option value="BAJA">Baja</option>
+              <option value="MEDIA" selected>Media</option>
+              <option value="ALTA">Alta</option>
+              <option value="URGENTE">Urgente</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg">
+          <label class="flabel">Columna</label>
+          <select class="fselect" id="tCol"></select>
+        </div>
+        <div class="fg">
+          <label class="flabel">Fecha de vencimiento</label>
+          <input class="finput" id="tFV" type="datetime-local" />
+        </div>
+        <div class="fg">
+          <label class="flabel">Responsables</label>
+          <div class="resp-lista" id="respLista"></div>
+        </div>
+        <div class="ferror" id="tError"></div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="cerrarModal('mTarea')">
+            Cancelar
+          </button>
+          <button class="btn btn-primary" onclick="crearTarea()">
+            <i class="ph ph-plus"></i> Crear tarea
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="mAsignar">
+      <div class="modal">
+        <div class="modal-t">
+          <i class="ph ph-user-plus" style="color: var(--a)"></i> Asignar
+          responsables
+        </div>
+        <input type="hidden" id="asignarTareaId" />
+        <div class="fg">
+          <label class="flabel">Developers disponibles</label>
+          <div class="resp-lista" id="asignarLista"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="cerrarModal('mAsignar')">
+            Cancelar
+          </button>
+          <button class="btn btn-primary" onclick="guardarAsignacion()">
+            <i class="ph ph-check"></i> Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="mInvitar">
+      <div class="modal" style="width: 380px">
+        <div class="modal-t">
+          <i class="ph ph-envelope" style="color: var(--a)"></i> Invitar miembro
+        </div>
+        <input type="hidden" id="invitarPrId" />
+        <div class="fg">
+          <label class="flabel">Correo del usuario</label>
+          <input
+            class="finput"
+            id="invEmail"
+            type="email"
+            placeholder="usuario@empresa.com"
+          />
+        </div>
+        <div class="ferror" id="invError"></div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="cerrarModal('mInvitar')">
+            Cancelar
+          </button>
+          <button class="btn btn-primary" onclick="invitarMiembro()">
+            <i class="ph ph-paper-plane-right"></i> Invitar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="mColumna">
+      <div class="modal" style="width: 380px">
+        <div class="modal-t">
+          <i class="ph ph-columns" style="color: var(--a)"></i> Nueva columna
+        </div>
+        <div class="fg">
+          <label class="flabel">Nombre de la columna</label>
+          <input
+            class="finput"
+            id="colNombre"
+            placeholder="Ej: En pruebas, Bloqueado..."
+          />
+          <div class="ferror" id="colError"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="cerrarModal('mColumna')">
+            Cancelar
+          </button>
+          <button class="btn btn-primary" onclick="confirmarAgregarColumna()">
+            <i class="ph ph-plus"></i> Crear columna
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast-wrap" id="toastWrap"></div>
+
+    <!-- SCRIPTS -->
+    <script src="js/app.js"></script>
+    <script src="js/tablero.js"></script>
+    <script src="js/vistas.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/loader.js"></script>
+  </body>
+</html>

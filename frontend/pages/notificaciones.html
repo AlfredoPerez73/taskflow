@@ -1,0 +1,67 @@
+<div class="pantalla" id="pantalla-notificaciones">
+  <div class="page-wrap">
+    <div class="page-head">
+      <div>
+        <div class="page-title">Notificaciones</div>
+        <div class="page-desc" id="notifDesc">Alertas y avisos del sistema</div>
+      </div>
+      <div class="flex" style="gap: 8px">
+        <button
+          class="btn btn-outline btn-sm"
+          id="btnMarcarLeidas"
+          onclick="marcarTodasLeidas()"
+          style="display: none"
+        >
+          <i class="ph ph-checks"></i> Marcar todas leídas
+        </button>
+      </div>
+    </div>
+    <div id="panelAdminNotif" style="display: none">
+      <div class="card">
+        <div class="flex-between" style="margin-bottom: 14px">
+          <div class="card-t" style="margin-bottom: 0">
+            <i class="ph ph-globe"></i> Todas las notificaciones del sistema
+          </div>
+          <span class="badge bi"
+            ><i class="ph ph-shield-star"></i> Vista Admin</span
+          >
+        </div>
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mensaje</th>
+                <th>Tipo</th>
+                <th>Destinatario</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="tbTodasNotif">
+              <tr>
+                <td colspan="5" class="vacío">Cargando...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="panelMisNotif" style="display: none">
+      <div class="card mb16">
+        <div class="card-t">
+          <i class="ph ph-bell-simple"></i> Mis notificaciones
+        </div>
+        <div id="listaNotifc" class="vacío">Cargando...</div>
+      </div>
+      <div class="card">
+        <div class="card-t"><i class="ph ph-sliders"></i> Preferencias</div>
+        <div id="prefsNotif"></div>
+        <div style="margin-top: 16px">
+          <button class="btn btn-primary btn-sm" onclick="guardarPrefs()">
+            <i class="ph ph-floppy-disk"></i> Guardar preferencias
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
