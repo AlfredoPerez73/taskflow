@@ -208,7 +208,8 @@ async def mover_tarea(tarea_id: str, datos: MoverTarea, usuario_id: str) -> dict
                                {"columnaId": columna_anterior}, {"columnaId": datos.columnaIdDestino},
                                tarea["proyectoId"])
     for r_id in tarea.get("responsables", []):
-        await crear_notificacion_interna(db, r_id, f"La tarea '{tarea["titulo"]}' fue movida", "ESTADO_TAREA_CAMBIADO", tarea_id=tarea_id, proyecto_id=tarea["proyectoId"], titulo_tarea=tarea["titulo"])
+        _titulo_tarea = tarea["titulo"]
+    await crear_notificacion_interna(db, r_id, f"La tarea '{_titulo_tarea}' fue movida", "ESTADO_TAREA_CAMBIADO", tarea_id=tarea_id, proyecto_id=tarea["proyectoId"], titulo_tarea=_titulo_tarea)
     return await obtener_tarea(tarea_id)
 
 
