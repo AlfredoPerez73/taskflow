@@ -7,13 +7,14 @@ from app.schemas.reportes import (
 )
 from app.services import servicio_reporte
 from app.core.dependencias import obtener_usuario_actual, requerir_rol
+from app.patterns.abstract_factory.fabrica_temas import listar_temas
 
 enrutador = APIRouter(tags=["Reportes y Configuración"])
 
 
-@enrutador.get("/proyectos/{proyecto_id}/metricas", response_model=RespuestaMetricasProyecto,
+@enrutador.get("/proyectos/{proyecto_id}/metricas",
     summary="Dashboard de métricas del proyecto",
-    description="Devuelve: total de tareas, distribución por columna, tareas por usuario, cantidad vencidas y progreso general en porcentaje.")
+    description="Devuelve: total de tareas, distribución por columna/prioridad/tipo, tareas por usuario, vencidas, completadas, progreso y velocidad semanal.")
 async def metricas(proyecto_id: str, _: dict = Depends(obtener_usuario_actual)):
     return await servicio_reporte.obtener_metricas_proyecto(proyecto_id)
 
@@ -49,6 +50,13 @@ async def guardar_filtro(datos: GuardarFiltro, usuario: dict = Depends(obtener_u
     description="Devuelve los filtros guardados por el usuario autenticado en el proyecto.")
 async def listar_filtros(proyecto_id: str, usuario: dict = Depends(obtener_usuario_actual)):
     return await servicio_reporte.listar_filtros_guardados(proyecto_id, usuario["_id"])
+
+
+@enrutador.get("/temas",
+    summary="Listar todos los temas — Patrón Abstract Factory",
+    description="Devuelve todos los temas disponibles con sus variables CSS completas generadas por cada fábrica concreta.")
+async def listar_todos_temas(_: dict = Depends(obtener_usuario_actual)):
+    return listar_temas()
 
 
 @enrutador.get("/temas/{nombre_tema}",

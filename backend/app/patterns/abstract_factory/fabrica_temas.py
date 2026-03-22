@@ -117,10 +117,36 @@ class FabricaTemaAzul(FabricaTema):
         }
 
 
+class FabricaTemaRojo(FabricaTema):
+    def crear_colores(self) -> ColoresTema:
+        return {
+            "fondo":      "#0f0508",
+            "superficie": "#1a0a0d",
+            "superficie2": "#250d12",
+            "borde":      "#3d1520",
+            "acento":     "#f87171",
+            "texto":      "#fce7e7",
+            "silenciado": "#8a5a5a",
+            "verde":      "#34d399",
+            "ambar":      "#fbbf24",
+            "rojo":       "#f43f5e",
+            "azul":       "#60a5fa",
+        }
+
+    def crear_variables(self) -> VariablesTema:
+        return {
+            "nombre": "rojo",
+            "colores": self.crear_colores(),
+            "fuente_base": "Syne, sans-serif",
+            "radio_borde": "6px",
+        }
+
+
 _fabricas: dict[str, FabricaTema] = {
     "oscuro": FabricaTemaOscuro(),
     "claro": FabricaTemaClaro(),
     "azul": FabricaTemaAzul(),
+    "rojo": FabricaTemaRojo(),
 }
 
 
@@ -133,3 +159,17 @@ def obtener_fabrica_tema(nombre_tema: str) -> FabricaTema:
 
 def obtener_variables_tema(nombre_tema: str) -> VariablesTema:
     return obtener_fabrica_tema(nombre_tema).crear_variables()
+
+
+def listar_temas() -> list[dict]:
+    """
+    Devuelve la lista de todos los temas disponibles con sus variables completas.
+    Cada elemento es generado por la fábrica concreta correspondiente.
+    """
+    return [
+        {
+            "nombre": nombre,
+            "variables": fabrica.crear_variables(),
+        }
+        for nombre, fabrica in _fabricas.items()
+    ]

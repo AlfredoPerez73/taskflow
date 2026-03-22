@@ -63,3 +63,5 @@ class ActualizarConfiguracion(BaseModel):
     nombrePlataforma: Optional[str] = None
     tamanoMaxArchivoMb: Optional[int] = Field(None, ge=1, le=100)
     zona_horaria: Optional[str] = None
+    tema: Optional[str] = None
+    politicaContrasena: Optional[dict] = None

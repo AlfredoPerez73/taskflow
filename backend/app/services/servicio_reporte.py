@@ -167,20 +167,41 @@ async def listar_filtros_guardados(proyecto_id: str, usuario_id: str) -> list:
 async def obtener_configuracion() -> dict:
     db = _db()
     config = await db["configuracion_sistema"].find_one({"_id": "global"})
+
+    # Valores por defecto
+    defaults = {
+        "nombrePlataforma": "TaskFlow",
+        "tamanoMaxArchivoMb": 10,
+        "zona_horaria": "America/Bogota",
+        "tema": "oscuro",
+        "politicaContrasena": {
+            "longitudMinima": 8, "requiereMayusculas": True,
+            "requiereNumeros": True, "requiereSimbolos": False, "caducidadDias": 90,
+        },
+    }
+
     if not config:
-        config = {
-            "_id": "global", "nombrePlataforma": "TaskFlow",
-            "tamanoMaxArchivoMb": 10, "zona_horaria": "America/Bogota", "tema": "oscuro",
-            "politicaContrasena": {"longitudMinima": 8, "requiereMayusculas": True,
-                                   "requiereNumeros": True, "requiereSimbolos": False, "caducidadDias": 90},
-        }
-    config["temaVariables"] = obtener_variables_tema(config.get("tema", "oscuro"))
-    return config
+        config = defaults
+    else:
+        # Completar campos faltantes con defaults
+        for k, v in defaults.items():
+            if k not in config:
+                config[k] = v
+
+    # Agregar variables del tema (Abstract Factory)
+    tema_actual = config.get("tema", "oscuro")
+    try:
+        config["temaVariables"] = obtener_variables_tema(tema_actual)
+    except Exception:
+        config["temaVariables"] = obtener_variables_tema("oscuro")
+
+    # Devolver dict limpio sin _id de MongoDB
+    return {k: v for k, v in config.items() if k != "_id"}
 
 
 async def actualizar_configuracion(datos: ActualizarConfiguracion) -> dict:
     db = _db()
-    cambios = {k: v for k, v in datos.model_dump().items() if v is not None}
+    cambios = datos.model_dump(exclude_none=True)
     await db["configuracion_sistema"].update_one({"_id": "global"}, {"$set": cambios}, upsert=True)
     return await obtener_configuracion()
 

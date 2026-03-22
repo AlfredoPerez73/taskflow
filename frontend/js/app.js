@@ -94,6 +94,7 @@ function mostrarPantalla(nombre) {
     notificaciones: "Notificaciones",
     perfil: "Mi Perfil",
     registro: "Crear Usuario",
+    configuracion: "Configuración",
   };
   if (bc) bc.textContent = etiquetas[nombre] || "";
   // Limpiar estado visual de la pantalla anterior al navegar
@@ -105,8 +106,6 @@ function mostrarPantalla(nombre) {
     tablero: async () => {
       await cargarSelectores();
       _inicializarTablero();
-      if (typeof conectarStream === "function")
-        setTimeout(() => conectarStream(proyActualId), 300);
     },
     tareas: async () => {
       await cargarSelectores();
@@ -123,6 +122,16 @@ function mostrarPantalla(nombre) {
       cargarTodasNotificaciones();
     },
     perfil: cargarPerfil,
+    configuracion: () => {
+      // Verificar que el slot fue llenado por loader.js
+      const check = document.getElementById("pantalla-configuracion");
+      if (!check || check.children.length === 0) {
+        // El slot aún no tiene contenido — esperar y reintentar
+        setTimeout(() => cargarConfiguracion(), 100);
+        return;
+      }
+      cargarConfiguracion();
+    },
   };
   acc[nombre]?.();
 }

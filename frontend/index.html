@@ -19,7 +19,7 @@
       src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js"
       defer
     ></script>
-    <link rel="stylesheet" href="css/estilos.css" />
+    <link rel="stylesheet" href="css/estilos.css?v=1774141362" />
   </head>
   <body>
     <div class="app" id="app">
@@ -32,14 +32,6 @@
         <div class="topbar-sep" id="topSep" style="display: none"></div>
         <span id="topBreadcrumb" style="display: none"></span>
         <div class="topbar-right">
-          <button
-            class="btn-tema"
-            id="btnTema"
-            onclick="toggleTema()"
-            title="Cambiar tema"
-          >
-            <i class="ph ph-sun"></i>
-          </button>
           <div
             class="topbar-notif"
             id="btnNotif"
@@ -173,6 +165,14 @@
             <span class="nav-ico"><i class="ph ph-bell-simple"></i></span>
             Notificaciones
           </div>
+          <div
+            class="nav-item"
+            onclick="mostrarPantalla('configuracion')"
+            data-p="configuracion"
+          >
+            <span class="nav-ico"><i class="ph ph-gear"></i></span>
+            Configuración
+          </div>
         </div>
       </nav>
 
@@ -189,6 +189,7 @@
         <div id="slot-historial"></div>
         <div id="slot-notificaciones"></div>
         <div id="slot-perfil"></div>
+        <div id="slot-configuracion"></div>
       </main>
     </div>
 
@@ -375,6 +376,7 @@
     <script src="js/tablero.js"></script>
     <script src="js/vistas.js"></script>
     <script src="js/dashboard.js"></script>
+    <script src="js/configuracion.js"></script>
     <script src="js/loader.js"></script>
   </body>
 </html>
