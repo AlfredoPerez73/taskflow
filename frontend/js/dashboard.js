@@ -764,6 +764,14 @@ async function cargarTareasPaginadas(proyId, pagina) {
   proyActualId = proyId;
   _paginaTareas = pagina || 1;
 
+  // Cargar columnas del tablero para el modal de nueva tarea
+  try {
+    const tableros = await api("GET", `/proyectos/${proyId}/tableros`);
+    colsActuales = tableros[0]?.columnas || [];
+  } catch (_) {
+    colsActuales = [];
+  }
+
   try {
     const todos = await api("GET", "/usuarios/activos");
     miembrosActuales = todos

@@ -219,7 +219,13 @@ async function crearTarea() {
     });
     cerrarModal("mTarea");
     toast("Tarea creada");
-    cargarTablero(proyActualId);
+    // Actualizar vista según la pantalla activa
+    const pantallaActiva = document.querySelector(".pantalla.activa");
+    if (pantallaActiva?.id === "pantalla-tareas") {
+      cargarTareasPaginadas(proyActualId, _paginaTareas || 1);
+    } else {
+      cargarTablero(proyActualId);
+    }
   } catch (e) {
     document.getElementById("tError").textContent = e.message;
   }

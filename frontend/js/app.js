@@ -3,7 +3,9 @@
    Estado global, HTTP, utilidades, navegación, auth, tema
 ════════════════════════════════════════════════════ */
 
-const API = "http://localhost:8000/api/v1";
+// URL del backend — en producción se lee de window.API_URL definido en index.html
+// En desarrollo usa localhost:8000
+const API = window.API_URL || "http://localhost:8000/api/v1";
 let S = null;
 let proyActualId = null;
 let colsActuales = [];
@@ -378,10 +380,17 @@ function _inicializarTablero() {
 function _inicializarTareas() {
   const sel = document.getElementById("selTareasProy");
   if (!sel) return;
-  if (sel.value) {
+  // Si hay proyecto activo o seleccionado, cargarlo
+  if (proyActualId && [...sel.options].some((o) => o.value === proyActualId)) {
+    sel.value = proyActualId;
+    cargarTareasPaginadas(proyActualId, 1);
+  } else if (sel.value) {
+    cargarTareasPaginadas(sel.value, 1);
+  } else if (sel.options.length > 1) {
+    // Seleccionar el primer proyecto automáticamente
+    sel.selectedIndex = 1;
     cargarTareasPaginadas(sel.value, 1);
   } else {
-    // Limpiar estado y tabla
     const tb = document.getElementById("tbTareas");
     if (tb)
       tb.innerHTML =
