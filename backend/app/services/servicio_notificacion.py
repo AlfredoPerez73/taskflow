@@ -4,7 +4,20 @@ import uuid
 
 from app.db.conexion import ConexionMongoDB
 from app.schemas.notificaciones import ActualizarPreferencias
-from app.core.gestor_eventos import gestor_eventos, evento_notificacion
+from app.patterns.adapter.notificacion_adapter import SolicitudNotificacion
+from app.patterns.adapter.proveedor_notificacion import ProveedorNotificacion
+
+# Instancia única del proveedor (reutilizable)
+_proveedor_notificacion = ProveedorNotificacion()
+# gestor_eventos es opcional (SSE en tiempo real)
+# Si no existe el archivo, las notificaciones funcionan igual (solo sin push)
+try:
+    from app.core.gestor_eventos import gestor_eventos, evento_notificacion
+    _SSE_ACTIVO = True
+except ImportError:
+    gestor_eventos = None
+    evento_notificacion = lambda n: {}
+    _SSE_ACTIVO = False
 
 
 def _db():
@@ -52,7 +65,8 @@ async def crear_notificacion_interna(
         "tituloTarea": titulo_tarea,
     }
     await db["notificaciones"].insert_one(notif)
-    gestor_eventos.publicar_a_usuario(usuario_id, evento_notificacion(notif))
+    if _SSE_ACTIVO and gestor_eventos:
+        gestor_eventos.publicar_a_usuario(usuario_id, evento_notificacion(notif))
 
 
 async def listar_notificaciones(usuario_id: str) -> list:
@@ -118,3 +132,49 @@ async def actualizar_preferencias(usuario_id: str, datos: ActualizarPreferencias
         {"usuarioId": usuario_id}, {"$set": cambios}, upsert=True
     )
     return await obtener_preferencias(usuario_id)
+
+
+async def enviar_notificacion_externa(
+    usuario_id: str,
+    mensaje: str,
+    canal: str = "email",
+    asunto: str = "Notificación TaskFlow",
+) -> dict:
+    """
+    Envía una notificación por canal externo usando Factory Method + Adapter.
+
+    Flujo (igual que el ejemplo bancario):
+      1. ProveedorNotificacion.get(canal)  → FabricaEmail / FabricaWhatsApp / FabricaSms
+      2. fabrica.get()                     → EmailAdaptee / WhatsAppAdaptee / SmsAdaptee
+      3. adapter.enviar(solicitud)         → llama a la API externa y traduce respuesta
+    """
+    db = _db()
+    usuario = await db["usuarios"].find_one({"_id": usuario_id})
+    if not usuario:
+        return {"enviada": False, "detalle": "Usuario no encontrado"}
+
+    try:
+        # Paso 1 — Factory Method: obtener la fábrica del canal
+        fabrica = _proveedor_notificacion.get(canal)
+
+        # Paso 2 — Factory Method: crear el adaptador concreto
+        adapter = fabrica.get()
+
+        # Paso 3 — Adapter: traducir y enviar
+        solicitud = SolicitudNotificacion(
+            destinatario=usuario.get("nombre", "Usuario"),
+            contacto=usuario.get("email", ""),
+            mensaje=mensaje,
+            asunto=asunto,
+        )
+        respuesta = adapter.enviar(solicitud)
+
+        return {
+            "enviada": respuesta.enviada,
+            "canal":   respuesta.canal,
+            "detalle": respuesta.detalle,
+        }
+    except ValueError as e:
+        return {"enviada": False, "detalle": str(e)}
+    except Exception as e:
+        return {"enviada": False, "detalle": f"Error interno: {str(e)}"}
