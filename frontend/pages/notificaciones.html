@@ -26,6 +26,14 @@
             ><i class="ph ph-shield-star"></i> Vista Admin</span
           >
         </div>
+        <div style="margin-bottom: 16px">
+          <button
+            class="btn btn-primary btn-sm"
+            onclick="cargarTodasNotificaciones()"
+          >
+            <i class="ph ph-download"></i> Cargar notificaciones
+          </button>
+        </div>
         <div class="tabla-wrap">
           <table>
             <thead>
@@ -39,7 +47,9 @@
             </thead>
             <tbody id="tbTodasNotif">
               <tr>
-                <td colspan="5" class="vacío">Cargando...</td>
+                <td colspan="5" class="vacío">
+                  Haz clic en "Cargar notificaciones" para ver el sistema
+                </td>
               </tr>
             </tbody>
           </table>
@@ -53,10 +63,36 @@
         </div>
         <div id="listaNotifc" class="vacío">Cargando...</div>
       </div>
-      <div class="card">
-        <div class="card-t"><i class="ph ph-sliders"></i> Preferencias</div>
+
+      <div class="card mb16">
+        <div class="card-t">
+          <i class="ph ph-broadcast"></i> Canal de notificaciones
+        </div>
+        <div style="margin-bottom: 12px">
+          <select class="finput" id="canalNotif">
+            <option value="IN_APP">📱 Solo en la app (In-App)</option>
+            <option value="EMAIL">📧 Solo por Email</option>
+            <option value="AMBOS">📱 Ambos (In-App + Email/WhatsApp)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card mb16">
+        <div class="card-t">
+          <i class="ph ph-sliders"></i> Preferencias de notificación
+        </div>
         <div id="prefsNotif"></div>
-        <div style="margin-top: 16px">
+        <div
+          style="
+            margin-top: 16px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+          "
+        >
+          <button class="btn btn-outline" onclick="cargarNotificaciones()">
+            <i class="ph ph-arrow-clockwise"></i> Recargar
+          </button>
           <button class="btn btn-primary btn-sm" onclick="guardarPrefs()">
             <i class="ph ph-floppy-disk"></i> Guardar preferencias
           </button>

@@ -1,10 +1,9 @@
 /* ═══════════════════════════════════════════════════
    TaskFlow — app.js
    Estado global, HTTP, utilidades, navegación, auth, tema
+   ACTUALIZADO: conecta SSE al iniciar sesión
 ════════════════════════════════════════════════════ */
 
-// URL del backend — en producción se lee de window.API_URL definido en index.html
-// En desarrollo usa localhost:8000
 const API = window.API_URL || "http://localhost:8000/api/v1";
 let S = null;
 let proyActualId = null;
@@ -57,7 +56,7 @@ function toggleVerPass() {
   }
 }
 
-/* ── TEMA OSCURO / CLARO ── */
+/* ── TEMA ── */
 function aplicarTema(tema) {
   document.documentElement.setAttribute("data-tema", tema);
   localStorage.setItem("tf_tema", tema);
@@ -99,7 +98,6 @@ function mostrarPantalla(nombre) {
     configuracion: "Configuración",
   };
   if (bc) bc.textContent = etiquetas[nombre] || "";
-  // Limpiar estado visual de la pantalla anterior al navegar
   _limpiarPantalla(nombre);
 
   const acc = {
@@ -125,10 +123,8 @@ function mostrarPantalla(nombre) {
     },
     perfil: cargarPerfil,
     configuracion: () => {
-      // Verificar que el slot fue llenado por loader.js
       const check = document.getElementById("pantalla-configuracion");
       if (!check || check.children.length === 0) {
-        // El slot aún no tiene contenido — esperar y reintentar
         setTimeout(() => cargarConfiguracion(), 100);
         return;
       }
@@ -153,9 +149,7 @@ function actualizarUI() {
 
   const topAv = document.getElementById("topAvatar");
   if (u.avatarUri) {
-    topAv.innerHTML = `<img src="${u.avatarUri}"
-      style="width:22px;height:22px;border-radius:50%;object-fit:cover"
-      onerror="this.style.display='none'">`;
+    topAv.innerHTML = `<img src="${u.avatarUri}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">`;
   } else {
     topAv.textContent = inic(u.nombre);
   }
@@ -167,8 +161,6 @@ function actualizarUI() {
     rol === "ADMIN" ? "" : "none";
   document.getElementById("navRegistrar").style.display =
     rol === "ADMIN" ? "" : "none";
-
-  // Todos los roles ven sus notificaciones
   document.getElementById("navNotificaciones").style.display = "";
   document.getElementById("btnNotif").style.display = "";
 
@@ -248,11 +240,16 @@ async function iniciarSesion() {
       false,
     );
     localStorage.setItem("tf_s", JSON.stringify(S));
-    // Ocultar el overlay del login
     const overlay = document.getElementById("loginOverlay");
     if (overlay) overlay.classList.add("oculto");
     actualizarUI();
     mostrarPantalla("dashboard");
+
+    // ── Conectar SSE de notificaciones en tiempo real ──
+    if (typeof window._conectarStreamSSE === "function") {
+      setTimeout(() => window._conectarStreamSSE(), 800);
+    }
+
     try {
       const ns = await api("GET", "/notificaciones/");
       const noLeidas = ns.filter((n) => !n.leida).length;
@@ -278,13 +275,17 @@ async function iniciarSesion() {
 }
 
 function cerrarSesion() {
+  // Desconectar SSE
+  if (typeof window._desconectarStreamSSE === "function")
+    window._desconectarStreamSSE();
+
   S = null;
   proyActualId = null;
   colsActuales = [];
   miembrosActuales = [];
   if (typeof _cacheUsuarios !== "undefined") _cacheUsuarios = null;
-  if (typeof desconectarStream === "function") desconectarStream();
   localStorage.removeItem("tf_s");
+
   [
     "sidebar",
     "topSep",
@@ -300,11 +301,10 @@ function cerrarSesion() {
   document
     .querySelectorAll(".nav-item")
     .forEach((n) => n.classList.remove("activo"));
-  // Mostrar el overlay del login
+
   const overlay = document.getElementById("loginOverlay");
   if (overlay) {
     overlay.classList.remove("oculto");
-    // Limpiar campos
     const lEmail = document.getElementById("lEmail");
     const lPass = document.getElementById("lPass");
     const lError = document.getElementById("lError");
@@ -346,26 +346,18 @@ function actualizarBadgeNotif(n) {
   b.textContent = n;
 }
 
-/* ── LIMPIEZA DE ESTADO AL NAVEGAR ── */
+/* ── LIMPIEZA ── */
 function _limpiarPantalla(pantallaNueva) {
-  // Al salir del tablero sin proyecto, asegurar que el board muestre mensaje correcto
-  if (pantallaNueva !== "tablero") {
-    const board = document.getElementById("kanbanBoard");
-    // No limpiar si tiene proyecto activo y es solo navegación temporal
-  }
-  // Al entrar a tareas o tablero desde otra pantalla, NO reusar datos de otro proyecto
-  // Solo limpiamos si el selector de destino no tiene proyecto seleccionado
+  // placeholder para futura lógica de limpieza
 }
 
 function _inicializarTablero() {
   const sel = document.getElementById("selPT");
   if (!sel) return;
   if (sel.value) {
-    // Hay proyecto en el selector: sincronizar y cargar
     proyActualId = sel.value;
     cargarTablero(proyActualId);
   } else {
-    // Sin proyecto seleccionado: limpiar todo y mostrar mensaje
     proyActualId = null;
     colsActuales = [];
     const board = document.getElementById("kanbanBoard");
@@ -380,21 +372,19 @@ function _inicializarTablero() {
 function _inicializarTareas() {
   const sel = document.getElementById("selTareasProy");
   if (!sel) return;
-  // Si hay proyecto activo o seleccionado, cargarlo
   if (proyActualId && [...sel.options].some((o) => o.value === proyActualId)) {
     sel.value = proyActualId;
     cargarTareasPaginadas(proyActualId, 1);
   } else if (sel.value) {
     cargarTareasPaginadas(sel.value, 1);
   } else if (sel.options.length > 1) {
-    // Seleccionar el primer proyecto automáticamente
     sel.selectedIndex = 1;
     cargarTareasPaginadas(sel.value, 1);
   } else {
     const tb = document.getElementById("tbTareas");
     if (tb)
       tb.innerHTML =
-        '<tr><td colspan="6" class="vacío">Selecciona un proyecto para ver las tareas</td></tr>';
+        '<tr><td colspan="7" class="vacío">Selecciona un proyecto para ver las tareas</td></tr>';
   }
 }
 
@@ -416,16 +406,20 @@ function _inicializarTareas() {
     if (saved) {
       try {
         S = JSON.parse(saved);
-        // Ocultar overlay del login si hay sesión guardada
         const overlay = document.getElementById("loginOverlay");
         if (overlay) overlay.classList.add("oculto");
         actualizarUI();
         mostrarPantalla("dashboard");
+
+        // Reconectar SSE al recargar página con sesión activa
+        setTimeout(() => {
+          if (typeof window._conectarStreamSSE === "function")
+            window._conectarStreamSSE();
+        }, 1000);
       } catch {
         localStorage.removeItem("tf_s");
       }
     }
-    // Si no hay sesión, el overlay ya está visible por defecto
 
     document.getElementById("lPass")?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") iniciarSesion();

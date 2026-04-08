@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from app.db.conexion import ConexionMongoDB
 from app.db.indices import crear_indices
-from app.routes import usuarios, proyectos, tableros, tareas, notificaciones, reportes
+from app.routes import usuarios, proyectos, tableros, tareas, notificaciones, reportes, subtareas
 
 
 @asynccontextmanager
@@ -38,7 +38,8 @@ API REST desarrollada con **FastAPI** y **MongoDB Atlas**.
 | **Factory Method** | `patterns/factory/` | Crea tareas según tipo: BUG, FEATURE, TASK, IMPROVEMENT |
 | **Abstract Factory** | `patterns/abstract_factory/` | Genera familias de variables CSS para cada tema visual |
 | **Prototype** | `patterns/prototype/` | Clona tareas y proyectos con nuevos IDs |
-| **Builder** | `patterns/builder/` | Construye tareas complejas paso a paso de forma fluida |
+| **Builder** | `patterns/builder/` | Construye tareas complejas y subtareas paso a paso |
+| **Adapter** | `patterns/adapter/` | Traduce notificaciones a Email/WhatsApp/SMS |
 
 ### Autenticación
 
@@ -54,7 +55,7 @@ El token se obtiene en `POST /api/v1/usuarios/login` y expira en **8 horas**.
 |-----|----------|
 | **ADMIN** | Acceso total: usuarios, configuración, auditoría global |
 | **PROJECT_MANAGER** | Proyectos, tableros, columnas, reportes, invitaciones |
-| **DEVELOPER** | Tareas, comentarios, tiempo, notificaciones propias |
+| **DEVELOPER** | Tareas, subtareas, comentarios, tiempo, notificaciones propias |
 """,
     lifespan=ciclo_de_vida,
     docs_url="/docs",
@@ -95,13 +96,13 @@ app.include_router(usuarios.enrutador, prefix=PREFIJO)
 app.include_router(proyectos.enrutador, prefix=PREFIJO)
 app.include_router(tableros.enrutador, prefix=PREFIJO)
 app.include_router(tareas.enrutador, prefix=PREFIJO)
+app.include_router(subtareas.enrutador, prefix=PREFIJO)
 app.include_router(notificaciones.enrutador, prefix=PREFIJO)
 app.include_router(reportes.enrutador, prefix=PREFIJO)
 
 
 @app.get("/", tags=["Salud"], summary="Estado de la API")
 async def raiz():
-    """Verifica que la API esté activa y devuelve los enlaces de documentación."""
     return {
         "mensaje": "TaskFlow API activa",
         "version": "1.0.0",
@@ -113,7 +114,6 @@ async def raiz():
 
 @app.get("/salud", tags=["Salud"], summary="Health check")
 async def salud():
-    """Endpoint de comprobación de salud para monitoreo."""
     return {"estado": "ok"}
 
 
@@ -130,7 +130,6 @@ def schema_openapi_personalizado():
         license_info=app.license_info,
     )
 
-    # Configurar esquema de seguridad JWT global
     schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
@@ -140,7 +139,6 @@ def schema_openapi_personalizado():
         }
     }
 
-    # Aplicar seguridad a todas las rutas excepto login y registro
     rutas_publicas = {
         "/api/v1/usuarios/registro": ["post"],
         "/api/v1/usuarios/login": ["post"],
@@ -154,13 +152,13 @@ def schema_openapi_personalizado():
             else:
                 operacion.setdefault("security", [{"BearerAuth": []}])
 
-    # Orden de tags en la UI
     schema["tags"] = [
         {"name": "Usuarios",         "description": "RF-01 · Registro, login JWT, perfil y gestión de cuentas"},
         {"name": "Proyectos",         "description": "RF-02 · CRUD de proyectos, invitaciones, clonado (Prototype) y archivado"},
         {"name": "Tableros",          "description": "RF-03 · Tableros Kanban, columnas y límites WIP"},
         {"name": "Tareas",            "description": "RF-04 · Gestión de tareas (Factory Method + Builder + Prototype), comentarios y tiempo"},
-        {"name": "Notificaciones",    "description": "RF-05 · Notificaciones en tiempo real y preferencias por canal"},
+        {"name": "Subtareas",         "description": "RF-04b · Subtareas por tarea — Patrón Builder (ConstructorSubtarea)"},
+        {"name": "Notificaciones",    "description": "RF-05 · IN_APP + Email/WhatsApp/SMS via Factory Method + Adapter. SSE en tiempo real."},
         {"name": "Reportes y Configuración", "description": "RF-06/07/08/09 · Historial, auditoría, métricas, filtros y configuración del sistema"},
         {"name": "Salud",             "description": "Health check y metadatos de la API"},
     ]

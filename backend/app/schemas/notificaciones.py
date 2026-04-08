@@ -22,6 +22,9 @@ class ActualizarPreferencias(BaseModel):
     notificacionComentario: Optional[bool] = None
     notificacionCambioEstado: Optional[bool] = None
     canal: Optional[CanalNotificacion] = None
+    # Datos de contacto para canales externos
+    telefonoWhatsapp: Optional[str] = None
+    telefonoSms: Optional[str] = None
 
 
 class RespuestaPreferencias(BaseModel):
@@ -31,3 +34,5 @@ class RespuestaPreferencias(BaseModel):
     notificacionComentario: bool
     notificacionCambioEstado: bool
     canal: str
+    telefonoWhatsapp: Optional[str] = None
+    telefonoSms: Optional[str] = None

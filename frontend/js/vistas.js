@@ -755,27 +755,104 @@ async function marcarLeida(id) {
 }
 
 async function marcarTodasLeidas() {
+  if (!confirm("¿Marcar todas las notificaciones como leídas?")) return;
   try {
-    const r = await api("PUT", "/notificaciones/leer-todas");
-    toast(r.mensaje);
+    await api("PUT", "/notificaciones/leer-todas");
     cargarNotificaciones();
+    toast("✓ Todas las notificaciones marcadas como leídas");
   } catch (e) {
     toast(e.message, "err");
   }
 }
 
-async function guardarPrefs() {
-  const on = (id) => document.getElementById(id)?.classList.contains("on");
+async function cargarTodasNotificaciones() {
+  const esAdmin = S?.usuario?.rol === "ADMIN";
+  if (!esAdmin) {
+    toast("Acceso restringido", "err");
+    return;
+  }
+
+  const tbody = document.getElementById("tbTodasNotif");
+  tbody.innerHTML =
+    '<tr><td colspan="5" class="vacío"><span class="spinner"></span></td></tr>';
+
   try {
-    await api("PUT", "/notificaciones/preferencias", {
-      notificacionAsignacion: on("pn1"),
-      notificacionVencimiento: on("pn2"),
-      notificacionComentario: on("pn3"),
-      notificacionCambioEstado: on("pn4"),
-    });
-    toast("Preferencias guardadas");
+    const notifs = await api("GET", "/notificaciones/");
+
+    if (!notifs.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="vacío">Sin notificaciones en el sistema</td></tr>';
+      return;
+    }
+
+    const mapaUsuarios = {};
+    for (const n of notifs) {
+      if (!mapaUsuarios[n.usuarioId]) {
+        try {
+          const usr = await api("GET", `/usuarios/${n.usuarioId}`);
+          mapaUsuarios[n.usuarioId] = usr.nombre;
+        } catch {
+          mapaUsuarios[n.usuarioId] = n.usuarioId.slice(-6);
+        }
+      }
+    }
+
+    tbody.innerHTML = notifs
+      .map(
+        (n) => `
+      <tr>
+        <td class="txt2">${n.mensaje}</td>
+        <td><span class="badge bm">${n.tipo}</span></td>
+        <td class="txt3">${mapaUsuarios[n.usuarioId] || n.usuarioId}</td>
+        <td><span class="badge ${n.leida ? "bg" : "br"}">${n.leida ? "Leída" : "Sin leer"}</span></td>
+        <td class="txt3" style="font-size:11px">${fFecha(n.creadoEn)}</td>
+      </tr>
+    `,
+      )
+      .join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="vacío">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function guardarPrefs() {
+  if (!S) return;
+
+  const prefs = {};
+
+  [
+    ["pn1", "notificacionAsignacion"],
+    ["pn2", "notificacionVencimiento"],
+    ["pn3", "notificacionComentario"],
+    ["pn4", "notificacionCambioEstado"],
+  ].forEach(([id, campo]) => {
+    const el = document.getElementById(id);
+    prefs[campo] = el?.classList.contains("on") ?? true;
+  });
+
+  const canalSelect = document.getElementById("canalNotif");
+  if (canalSelect) {
+    prefs.canal = canalSelect.value || "IN_APP";
+  } else {
+    prefs.canal = "IN_APP";
+  }
+
+  try {
+    await api("PUT", "/notificaciones/preferencias", prefs);
+    toast("✓ Preferencias guardadas");
   } catch (e) {
     toast(e.message, "err");
+  }
+}
+
+function actualizarBadgeNotif(cantidad) {
+  const btn = document.getElementById("btnNotif");
+  if (!btn) return;
+
+  if (cantidad > 0) {
+    btn.innerHTML = `<i class="ph ph-bell-ringing"></i><span class="badge" style="position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;background:var(--red);color:white;border-radius:50%;font-weight:500">${cantidad > 99 ? "99+" : cantidad}</span>`;
+  } else {
+    btn.innerHTML = '<i class="ph ph-bell"></i>';
   }
 }
 

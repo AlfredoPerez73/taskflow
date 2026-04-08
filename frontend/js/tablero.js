@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════
-   TaskFlow — tablero.js
+   TaskFlow — tablero.js  (actualizado)
    Kanban: carga, drag & drop, columnas, tarjetas
+   NUEVO: botón de subtareas en cada tarjeta
 ════════════════════════════════════════════════════ */
 
 let dragTareaId = null;
@@ -19,14 +20,11 @@ async function cargarSelectores() {
       (id) => {
         const el = document.getElementById(id);
         if (!el) return;
-        // Guardar valor seleccionado antes de reemplazar opciones
         const valorAnterior = el.value;
         el.innerHTML = opts;
-        // Restaurar solo si el proyecto sigue existiendo en la lista
         if (valorAnterior && ps.some((p) => p.id === valorAnterior)) {
           el.value = valorAnterior;
         } else {
-          // No restaurar — proyecto ya no existe o no hay selección válida
           el.value = "";
         }
       },
@@ -49,18 +47,13 @@ function irTablero(id, nombre) {
 /* ── CARGA DEL TABLERO ── */
 async function cargarTablero(proyId) {
   if (!proyId) return;
-  // Verificar que el proyecto seleccionado en el UI coincide con el que se pide cargar
   const sel = document.getElementById("selPT");
-  if (sel && sel.value && sel.value !== proyId) {
-    // El usuario cambió el selector antes de que terminara la carga anterior — abortar
-    return;
-  }
+  if (sel && sel.value && sel.value !== proyId) return;
   proyActualId = proyId;
   const board = document.getElementById("kanbanBoard");
   board.innerHTML =
     '<div class="vacío" style="width:100%"><span class="spinner"></span> Cargando...</div>';
   try {
-    // Cargar tableros y miembros en paralelo
     const [tableros, miembros] = await Promise.all([
       api("GET", `/proyectos/${proyId}/tableros`),
       api("GET", `/proyectos/${proyId}/miembros`).catch(() => []),
@@ -126,6 +119,7 @@ function colColor(nombre) {
   return "var(--cyan)";
 }
 
+/* ── TARJETA KANBAN (con botón de subtareas) ── */
 function tarjeta(t) {
   const resps = (t.responsables || [])
     .slice(0, 3)
@@ -134,17 +128,28 @@ function tarjeta(t) {
       return `<div class="avatar avatar-sm" title="${m?.nombre || id}">${inic(m?.nombre || "?")}</div>`;
     })
     .join("");
+
+  const nSubtareas = (t.subtareas || []).length;
+
   return `<div class="k-card" draggable="true" data-tarea-id="${t.id}" data-col-id="${t.columnaId}">
     <div class="k-card-tags">
       <div class="prio ${colPrio(t.prioridad)}"></div>
       ${badgeTipo(t.tipo)}
       ${t.estaVencida ? '<span class="badge br">Vencida</span>' : ""}
+      ${nSubtareas > 0 ? `<span class="badge bm" title="Subtareas"><i class="ph ph-tree-structure" style="font-size:9px"></i> ${nSubtareas}</span>` : ""}
     </div>
     <div class="k-card-title">${t.titulo}</div>
     <div class="k-card-meta">
       <span class="k-card-id">#${t.id.slice(-6)}</span>
       <div class="flex" style="gap:4px">
         <div class="avatar-group">${resps}</div>
+        <button class="btn btn-ghost btn-xs" onclick="abrirPanelSubtareas('${t.id}','${t.titulo.replace(/'/g, "\\'")}')"
+          title="Subtareas (Builder)" style="color:var(--a2)">
+          <i class="ph ph-tree-structure"></i>
+        </button>
+        <button class="btn btn-ghost btn-xs" onclick="abrirPanelComentarios('${t.id}','${t.titulo.replace(/'/g, "\\'")}')">
+          <i class="ph ph-chat-circle-text"></i>
+        </button>
         <button class="btn btn-ghost btn-xs" onclick="abrirAsignar('${t.id}')" title="Asignar"><i class="ph ph-user-plus"></i></button>
         <button class="btn btn-ghost btn-xs" onclick="clonarTarea('${t.id}')" title="Clonar"><i class="ph ph-copy"></i></button>
         <button class="btn btn-red btn-xs" onclick="eliminarTarea('${t.id}')" title="Eliminar"><i class="ph ph-trash"></i></button>
