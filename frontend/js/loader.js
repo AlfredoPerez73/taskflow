@@ -1,54 +1,113 @@
-/* TaskFlow — loader.js */
+/* TaskFlow loader.js */
 const PAGINAS_HTML = {
   login: `<div class="login-overlay" id="loginOverlay">
-  <div class="login-split">
-    <div class="login-brand">
-      <div class="login-brand-logo">
-        <div class="login-brand-icon">TF</div>
-        <span class="login-brand-name">TaskFlow</span>
-      </div>
-      <div class="login-brand-body">
-        <div class="login-brand-title">Gestión ágil para<br>equipos que entregan</div>
-        <div class="login-brand-desc">Organiza proyectos, asigna tareas y mantén el control con tableros Kanban en tiempo real.</div>
-      </div>
-      <div class="login-brand-pills">
-        <div class="login-brand-pill"><i class="ph ph-kanban pico"></i> Kanban</div>
-        <div class="login-brand-pill"><i class="ph ph-users pico"></i> Equipos</div>
-        <div class="login-brand-pill"><i class="ph ph-chart-bar pico"></i> Reportes</div>
-        <div class="login-brand-pill"><i class="ph ph-bell pico"></i> Notificaciones</div>
-      </div>
-    </div>
-    <div class="login-form-panel">
-      <div class="login-form-title">Iniciar sesión</div>
-      <div class="login-form-sub">Ingresa tus credenciales para continuar</div>
-      <div class="fg">
-        <label class="flabel">Correo electrónico</label>
-        <input class="finput" id="lEmail" type="email" placeholder="correo@empresa.com" autocomplete="email">
-      </div>
-      <div class="fg">
-        <label class="flabel">Contraseña</label>
-        <div style="position:relative">
-          <input class="finput" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password" style="padding-right:40px">
-          <button onclick="toggleVerPass()" tabindex="-1" id="btnVerPass"
-            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);padding:4px;display:flex;align-items:center">
-            <i class="ph ph-eye" style="font-size:16px"></i>
-          </button>
+
+  <!-- Fondo con gradiente y elementos decorativos estilo NomiWise -->
+  <div class="login-bg">
+    <div class="login-bg-orb login-bg-orb1"></div>
+    <div class="login-bg-orb login-bg-orb2"></div>
+    <div class="login-bg-orb login-bg-orb3"></div>
+    <div class="login-bg-grid"></div>
+  </div>
+
+  <!-- Contenedor principal horizontal -->
+  <div class="login-card">
+
+    <!-- Panel izquierdo — branding + ilustración -->
+    <div class="login-left">
+      <div class="login-logo-row">
+        <div class="login-logo-icon">
+          <i class="ph ph-kanban"></i>
         </div>
-        <div class="ferror" id="lError"></div>
+        <span class="login-logo-text">TaskFlow</span>
       </div>
-      <button class="btn btn-primary btn-w" id="btnLogin" onclick="iniciarSesion()" style="margin-top:8px">
-        <i class="ph ph-sign-in"></i> Iniciar sesión
-      </button>
-      <div class="login-divider">roles del sistema</div>
-      <div style="display:flex;gap:7px;justify-content:center">
-        <span class="badge bi">Admin</span>
-        <span class="badge bb">Project Manager</span>
-        <span class="badge bg">Developer</span>
+
+      <div class="login-hero">
+        <div class="login-hero-title">Gestión ágil para<br>equipos que <span class="login-hero-accent">entregan</span></div>
+        <div class="login-hero-desc">Organiza proyectos, asigna tareas y mantén el control con tableros Kanban en tiempo real.</div>
+      </div>
+
+      <!-- Stats decorativas -->
+      <div class="login-stats">
+        <div class="login-stat">
+          <div class="login-stat-num">5</div>
+          <div class="login-stat-label">Patrones de diseño</div>
+        </div>
+        <div class="login-stat-sep"></div>
+        <div class="login-stat">
+          <div class="login-stat-num">3</div>
+          <div class="login-stat-label">Roles de usuario</div>
+        </div>
+        <div class="login-stat-sep"></div>
+        <div class="login-stat">
+          <div class="login-stat-num">∞</div>
+          <div class="login-stat-label">Proyectos</div>
+        </div>
+      </div>
+
+      <!-- Pills de features -->
+      <div class="login-pills">
+        <div class="login-pill"><i class="ph ph-kanban"></i> Kanban</div>
+        <div class="login-pill"><i class="ph ph-users"></i> Equipos</div>
+        <div class="login-pill"><i class="ph ph-chart-bar"></i> Reportes</div>
+        <div class="login-pill"><i class="ph ph-bell"></i> Notificaciones</div>
+        <div class="login-pill"><i class="ph ph-list-checks"></i> Subtareas</div>
       </div>
     </div>
+
+    <!-- Panel derecho — formulario -->
+    <div class="login-right">
+      <div class="login-form-header">
+        <div class="login-form-title">Iniciar sesión</div>
+        <div class="login-form-sub">Ingresa tus credenciales para continuar</div>
+      </div>
+
+      <div class="login-fields">
+        <div class="fg">
+          <label class="flabel">Correo electrónico</label>
+          <div class="login-input-wrap">
+            <i class="ph ph-envelope login-input-ico"></i>
+            <input class="finput login-finput" id="lEmail" type="email"
+              placeholder="correo@empresa.com" autocomplete="email">
+          </div>
+        </div>
+
+        <div class="fg">
+          <label class="flabel">Contraseña</label>
+          <div class="login-input-wrap">
+            <i class="ph ph-lock login-input-ico"></i>
+            <input class="finput login-finput login-finput-pass" id="lPass" type="password"
+              placeholder="••••••••" autocomplete="current-password">
+            <button onclick="toggleVerPass()" tabindex="-1" id="btnVerPass" class="login-eye-btn">
+              <i class="ph ph-eye" id="iconoVerPass"></i>
+            </button>
+          </div>
+          <div class="ferror" id="lError"></div>
+        </div>
+
+        <button class="btn btn-primary btn-w login-btn" id="btnLogin" onclick="iniciarSesion()">
+          <i class="ph ph-sign-in"></i> Iniciar sesión
+        </button>
+      </div>
+
+      <div class="login-roles">
+        <div class="login-roles-label">Roles del sistema</div>
+        <div class="login-roles-badges">
+          <span class="login-role-badge login-role-admin"><i class="ph ph-shield-check"></i> Admin</span>
+          <span class="login-role-badge login-role-pm"><i class="ph ph-briefcase"></i> Project Manager</span>
+          <span class="login-role-badge login-role-dev"><i class="ph ph-code"></i> Developer</span>
+        </div>
+      </div>
+
+      <div class="login-footer">
+        Universidad Popular del Cesar · Patrones de Diseño 2026
+      </div>
+    </div>
+
   </div>
 </div>
-<div class="pantalla activa" id="pantalla-login" style="display:none"></div>`,
+<div class="pantalla activa" id="pantalla-login" style="display:none"></div>
+`,
   dashboard: `<div class="pantalla" id="pantalla-dashboard">
   <div class="dash-wrap">
 
@@ -486,38 +545,190 @@ const PAGINAS_HTML = {
 `,
   notificaciones: `<div class="pantalla" id="pantalla-notificaciones">
   <div class="page-wrap">
+
     <div class="page-head">
-      <div><div class="page-title">Notificaciones</div><div class="page-desc" id="notifDesc">Alertas y avisos del sistema</div></div>
+      <div>
+        <div class="page-title">Notificaciones</div>
+        <div class="page-desc" id="notifDesc"><i class="ph ph-bell" style="font-size:13px"></i> Alertas y avisos del sistema</div>
+      </div>
       <div class="flex" style="gap:8px">
         <button class="btn btn-outline btn-sm" id="btnMarcarLeidas" onclick="marcarTodasLeidas()" style="display:none">
           <i class="ph ph-checks"></i> Marcar todas leídas
         </button>
       </div>
     </div>
-    <div id="panelAdminNotif" style="display:none">
+
+    <!-- PANEL ENVÍO EXTERNO — visible para Admin y PM -->
+    <div id="panelEnvioExterno" style="display:none" class="mb16">
+      <div class="card">
+        <div class="card-t">
+          <i class="ph ph-paper-plane-tilt" style="color:var(--a)"></i>
+          Enviar notificación externa
+          <span class="badge ba" style="margin-left:6px">Factory Method + Adapter</span>
+        </div>
+        <div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px">
+          Selecciona un canal → el sistema instancia la fábrica concreta → crea el adaptador → llama a la API externa.
+        </div>
+
+        <!-- Selector de canal -->
+        <div class="fg">
+          <label class="flabel">Canal de envío</label>
+          <div class="ncanal-grid" id="ncanalGrid">
+            <div class="ncanal-opt activo" data-canal="email" onclick="notifSelCanal(this)">
+              <i class="ph ph-envelope" style="font-size:22px;color:var(--blue)"></i>
+              <div class="ncanal-nombre">Email</div>
+              <div class="ncanal-clase">EmailAdaptee</div>
+            </div>
+            <div class="ncanal-opt" data-canal="whatsapp" onclick="notifSelCanal(this)">
+              <i class="ph ph-chat-circle-dots" style="font-size:22px;color:var(--green)"></i>
+              <div class="ncanal-nombre">WhatsApp</div>
+              <div class="ncanal-clase">WhatsAppAdaptee</div>
+            </div>
+            <div class="ncanal-opt" data-canal="sms" onclick="notifSelCanal(this)">
+              <i class="ph ph-device-mobile" style="font-size:22px;color:var(--amber)"></i>
+              <div class="ncanal-nombre">SMS</div>
+              <div class="ncanal-clase">SmsAdaptee</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flujo visual del patrón -->
+        <div class="nflujo">
+          <div class="nflujo-paso">
+            <div class="nflujo-ico"><i class="ph ph-buildings"></i></div>
+            <div>
+              <div class="nflujo-titulo">Proveedor</div>
+              <div class="nflujo-sub">get("<span id="nflujoCanal">email</span>")</div>
+            </div>
+          </div>
+          <i class="ph ph-arrow-right" style="color:var(--t4);font-size:14px"></i>
+          <div class="nflujo-paso nflujo-factory">
+            <div class="nflujo-ico"><i class="ph ph-factory"></i></div>
+            <div>
+              <div class="nflujo-titulo">Factory Method</div>
+              <div class="nflujo-sub" id="nflujoFabrica">FabricaEmail</div>
+            </div>
+          </div>
+          <i class="ph ph-arrow-right" style="color:var(--t4);font-size:14px"></i>
+          <div class="nflujo-paso nflujo-adapter">
+            <div class="nflujo-ico"><i class="ph ph-plug"></i></div>
+            <div>
+              <div class="nflujo-titulo">Adapter</div>
+              <div class="nflujo-sub" id="nflujoAdapter">EmailAdaptee</div>
+            </div>
+          </div>
+          <i class="ph ph-arrow-right" style="color:var(--t4);font-size:14px"></i>
+          <div class="nflujo-paso nflujo-api">
+            <div class="nflujo-ico"><i class="ph ph-cloud-arrow-up"></i></div>
+            <div>
+              <div class="nflujo-titulo">API Externa</div>
+              <div class="nflujo-sub" id="nflujoApi">EmailAPI</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario -->
+        <div class="frow" style="margin-top:14px">
+          <div class="fg">
+            <label class="flabel">Destinatario</label>
+            <select class="fselect" id="nDestinatario">
+              <option value="">— Cargando usuarios... —</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="flabel">Asunto</label>
+            <input class="finput" id="nAsunto" value="Notificación TaskFlow" placeholder="Asunto del email">
+          </div>
+        </div>
+
+        <!-- Campo de teléfono — visible solo para WhatsApp/SMS -->
+        <div class="fg" id="nTelWrap" style="display:none;margin-top:10px">
+          <label class="flabel" id="nTelLabel">Número de WhatsApp</label>
+          <div style="position:relative">
+            <i class="ph ph-phone" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:15px;pointer-events:none"></i>
+            <input class="finput" id="nTelefono" placeholder="+57 300 000 0000"
+              style="padding-left:36px"
+              title="Incluye el código de país. Ej: +57 para Colombia">
+          </div>
+          <div style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono)">
+            Incluye código de país · Ej: +57 310 555 1234
+          </div>
+        </div>
+
+        <div class="fg" style="margin-top:10px">
+          <label class="flabel">Mensaje</label>
+          <textarea class="ftextarea" id="nMensaje" placeholder="Escribe el mensaje..." style="min-height:72px"></textarea>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;gap:12px;flex-wrap:wrap">
+          <div id="nResultado" style="font-size:12px;font-family:var(--mono);color:var(--t3);flex:1"></div>
+          <div class="flex" style="gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="notifProbarTodos()" id="btnProbarCanales">
+              <i class="ph ph-broadcast"></i> Probar todos
+            </button>
+            <button class="btn btn-primary" onclick="notifEnviar()" id="btnEnviarNotif">
+              <i class="ph ph-paper-plane-tilt"></i> Enviar notificación
+            </button>
+          </div>
+        </div>
+        <div class="ferror" id="nError" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <!-- VISTA ADMIN: tabla global -->
+    <div id="panelAdminNotif" style="display:none" class="mb16">
       <div class="card">
         <div class="flex-between" style="margin-bottom:14px">
-          <div class="card-t" style="margin-bottom:0"><i class="ph ph-globe"></i> Todas las notificaciones del sistema</div>
-          <span class="badge bi"><i class="ph ph-shield-star"></i> Vista Admin</span>
+          <div class="card-t" style="margin-bottom:0">
+            <i class="ph ph-globe"></i> Actividad reciente del sistema
+          </div>
+          <div class="flex" style="gap:8px">
+            <span class="badge bi"><i class="ph ph-shield-star"></i> Admin</span>
+            <button class="btn btn-outline btn-xs" onclick="cargarTodasNotificaciones()">
+              <i class="ph ph-arrows-clockwise"></i> Actualizar
+            </button>
+          </div>
         </div>
         <div class="tabla-wrap">
           <table>
-            <thead><tr><th>Mensaje</th><th>Tipo</th><th>Destinatario</th><th>Estado</th><th>Fecha</th></tr></thead>
+            <thead><tr><th>Acción</th><th>Rol</th><th>Usuario</th><th>Estado</th><th>Fecha</th></tr></thead>
             <tbody id="tbTodasNotif"><tr><td colspan="5" class="vacío">Cargando...</td></tr></tbody>
           </table>
         </div>
       </div>
     </div>
+
+    <!-- VISTA USUARIO: mis notificaciones + preferencias -->
     <div id="panelMisNotif" style="display:none">
-      <div class="card mb16"><div class="card-t"><i class="ph ph-bell-simple"></i> Mis notificaciones</div><div id="listaNotifc" class="vacío">Cargando...</div></div>
+      <div class="card mb16">
+        <div class="card-t"><i class="ph ph-bell-simple"></i> Mis notificaciones</div>
+        <div id="listaNotifc" class="vacío">Cargando...</div>
+      </div>
+      <div class="card mb16">
+        <div class="card-t"><i class="ph ph-broadcast"></i> Canal de notificaciones</div>
+        <select class="fselect" id="canalNotif" style="margin-bottom:4px">
+          <option value="IN_APP">📱 Solo en la app (In-App)</option>
+          <option value="EMAIL">📧 Solo por Email</option>
+          <option value="AMBOS">📱📧 Ambos (In-App + Email)</option>
+        </select>
+      </div>
       <div class="card">
-        <div class="card-t"><i class="ph ph-sliders"></i> Preferencias</div>
+        <div class="card-t"><i class="ph ph-sliders"></i> Preferencias de notificación</div>
         <div id="prefsNotif"></div>
-        <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="guardarPrefs()"><i class="ph ph-floppy-disk"></i> Guardar preferencias</button></div>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="cargarNotificaciones()">
+            <i class="ph ph-arrow-clockwise"></i> Recargar
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="guardarPrefs()">
+            <i class="ph ph-floppy-disk"></i> Guardar preferencias
+          </button>
+        </div>
       </div>
     </div>
+
   </div>
-</div>`,
+</div>
+`,
   perfil: `<div class="pantalla" id="pantalla-perfil">
   <div class="perfil-wrap">
 
@@ -762,7 +973,7 @@ const PAGINAS_HTML = {
 };
 function cargarPaginas() {
   Object.entries(PAGINAS_HTML).forEach(([n, h]) => {
-    const s = document.getElementById(`slot-${n}`);
+    const s = document.getElementById("slot-" + n);
     if (s) s.innerHTML = h;
   });
 }

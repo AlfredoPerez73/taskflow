@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.seguridad import verificar_token
 from app.db.conexion import ConexionMongoDB
@@ -27,6 +27,37 @@ async def obtener_usuario_actual(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cuenta desactivada",
+        )
+    return usuario
+
+
+async def obtener_usuario_desde_query(token: str = Query(None)) -> dict:
+    """Obtener usuario desde token en query string (para SSE)"""
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token requerido",
+        )
+    try:
+        payload = verificar_token(token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido",
+        )
+    
+    usuario_id = payload.get("sub")
+    if not usuario_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token sin identificador de usuario",
+        )
+    db = ConexionMongoDB.obtener_instancia().obtener_base_datos()
+    usuario = await db["usuarios"].find_one({"_id": usuario_id})
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario no encontrado",
         )
     return usuario
 

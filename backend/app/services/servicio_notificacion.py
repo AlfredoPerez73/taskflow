@@ -1,9 +1,3 @@
-"""
-Servicio de notificaciones mejorado.
-- Notificaciones internas (IN_APP) con SSE en tiempo real
-- Envío externo por Email / WhatsApp / SMS via Adapter + Factory Method
-- Preferencias por usuario: canal (IN_APP | EMAIL | AMBOS)
-"""
 from datetime import datetime, timezone
 from fastapi import HTTPException
 import uuid
@@ -13,9 +7,10 @@ from app.schemas.notificaciones import ActualizarPreferencias
 from app.patterns.adapter.notificacion_adapter import SolicitudNotificacion
 from app.patterns.adapter.proveedor_notificacion import ProveedorNotificacion
 
-# Instancia única del proveedor (reutilizable entre llamadas)
+# Instancia única del proveedor (reutilizable)
 _proveedor_notificacion = ProveedorNotificacion()
-
+# gestor_eventos es opcional (SSE en tiempo real)
+# Si no existe el archivo, las notificaciones funcionan igual (solo sin push)
 try:
     from app.core.gestor_eventos import gestor_eventos, evento_notificacion
     _SSE_ACTIVO = True
@@ -31,89 +26,18 @@ def _db():
 
 def _serializar(doc: dict) -> dict:
     return {
-        "id":          doc["_id"],
-        "usuarioId":   doc["usuarioId"],
-        "mensaje":     doc["mensaje"],
-        "tipo":        doc["tipo"],
-        "leida":       doc.get("leida", False),
-        "creadoEn":    doc["creadoEn"],
-        "tareaId":     doc.get("tareaId"),
-        "proyectoId":  doc.get("proyectoId"),
+        "id":         doc["_id"],
+        "usuarioId":  doc["usuarioId"],
+        "mensaje":    doc["mensaje"],
+        "tipo":       doc["tipo"],
+        "leida":      doc.get("leida", False),
+        "creadoEn":   doc["creadoEn"],
+        # Metadatos de navegación — pueden ser None para notificaciones antiguas
+        "tareaId":    doc.get("tareaId"),
+        "proyectoId": doc.get("proyectoId"),
         "tituloTarea": doc.get("tituloTarea"),
     }
 
-
-# ─────────────────────────────────────────────────────
-# HELPERS INTERNOS
-# ─────────────────────────────────────────────────────
-
-async def _obtener_preferencias_usuario(db, usuario_id: str) -> dict:
-    """Devuelve las preferencias del usuario o los defaults."""
-    prefs = await db["preferencias_notificacion"].find_one({"usuarioId": usuario_id})
-    if not prefs:
-        return {
-            "usuarioId":               usuario_id,
-            "notificacionAsignacion":  True,
-            "notificacionVencimiento": True,
-            "notificacionComentario":  True,
-            "notificacionCambioEstado": True,
-            "canal": "IN_APP",
-            # Datos de contacto para canales externos (vacíos por defecto)
-            "telefonoWhatsapp": None,
-            "telefonoSms":      None,
-        }
-    return prefs
-
-
-async def _enviar_por_canal_externo(
-    db,
-    usuario: dict,
-    mensaje: str,
-    canal: str,
-    asunto: str = "Notificación TaskFlow",
-) -> dict:
-    """
-    Envía por canal externo usando el patrón Adapter + Factory Method.
-    Determina el contacto correcto según el canal:
-      - email    → usuario["email"]
-      - whatsapp → prefs["telefonoWhatsapp"] o usuario["telefono"]
-      - sms      → prefs["telefonoSms"]      o usuario["telefono"]
-    """
-    # Obtener datos de contacto del canal
-    prefs = await _obtener_preferencias_usuario(db, usuario["_id"])
-
-    contacto_map = {
-        "email":    usuario.get("email", ""),
-        "whatsapp": prefs.get("telefonoWhatsapp") or usuario.get("telefono", ""),
-        "sms":      prefs.get("telefonoSms")      or usuario.get("telefono", ""),
-    }
-    contacto = contacto_map.get(canal, usuario.get("email", ""))
-
-    try:
-        fabrica = _proveedor_notificacion.get(canal)
-        adapter = fabrica.get()
-        solicitud = SolicitudNotificacion(
-            destinatario=usuario.get("nombre", "Usuario"),
-            contacto=contacto,
-            mensaje=mensaje,
-            asunto=asunto,
-        )
-        respuesta = adapter.enviar(solicitud)
-        return {
-            "enviada": respuesta.enviada,
-            "canal":   respuesta.canal,
-            "detalle": respuesta.detalle,
-            "contacto_usado": contacto,
-        }
-    except ValueError as e:
-        return {"enviada": False, "canal": canal, "detalle": str(e)}
-    except Exception as e:
-        return {"enviada": False, "canal": canal, "detalle": f"Error: {str(e)}"}
-
-
-# ─────────────────────────────────────────────────────
-# FUNCIÓN PRINCIPAL: crear notificación
-# ─────────────────────────────────────────────────────
 
 async def crear_notificacion_interna(
     db,
@@ -126,8 +50,8 @@ async def crear_notificacion_interna(
     titulo_tarea: str | None = None,
 ) -> None:
     """
-    Crea una notificación IN_APP y, según las preferencias del usuario,
-    también envía por canal externo (email / whatsapp / sms).
+    Crea una notificación interna con metadatos opcionales de navegación.
+    Incluir tarea_id y proyecto_id permite al frontend navegar directo a la tarea.
     """
     notif = {
         "_id":         str(uuid.uuid4()),
@@ -141,45 +65,9 @@ async def crear_notificacion_interna(
         "tituloTarea": titulo_tarea,
     }
     await db["notificaciones"].insert_one(notif)
-
-    # Push SSE en tiempo real
     if _SSE_ACTIVO and gestor_eventos:
         gestor_eventos.publicar_a_usuario(usuario_id, evento_notificacion(notif))
 
-    # Envío externo según preferencias
-    try:
-        prefs = await _obtener_preferencias_usuario(db, usuario_id)
-        canal = prefs.get("canal", "IN_APP")
-
-        # Verificar que el tipo de notificación está habilitado
-        tipo_habilitado_map = {
-            "TAREA_ASIGNADA":        prefs.get("notificacionAsignacion",   True),
-            "TAREA_VENCIDA":         prefs.get("notificacionVencimiento",  True),
-            "COMENTARIO_EN_TAREA":   prefs.get("notificacionComentario",   True),
-            "MENCION_EN_COMENTARIO": prefs.get("notificacionComentario",   True),
-            "ESTADO_TAREA_CAMBIADO": prefs.get("notificacionCambioEstado", True),
-        }
-        if not tipo_habilitado_map.get(tipo, True):
-            return  # El usuario desactivó este tipo de notificación
-
-        if canal in ("EMAIL", "AMBOS"):
-            usuario = await db["usuarios"].find_one({"_id": usuario_id})
-            if usuario:
-                await _enviar_por_canal_externo(db, usuario, mensaje, "email")
-
-        if canal == "AMBOS":
-            usuario = usuario if "usuario" in dir() else await db["usuarios"].find_one({"_id": usuario_id})
-            if usuario:
-                tel = prefs.get("telefonoWhatsapp") or prefs.get("telefonoSms")
-                if tel:
-                    await _enviar_por_canal_externo(db, usuario, mensaje, "whatsapp")
-    except Exception:
-        pass  # Nunca bloquear el flujo principal por fallo en envío externo
-
-
-# ─────────────────────────────────────────────────────
-# CRUD NOTIFICACIONES
-# ─────────────────────────────────────────────────────
 
 async def listar_notificaciones(usuario_id: str) -> list:
     db = _db()
@@ -214,26 +102,26 @@ async def marcar_todas_como_leidas(usuario_id: str) -> dict:
     return {"mensaje": f"{resultado.modified_count} notificaciones marcadas como leídas"}
 
 
-# ─────────────────────────────────────────────────────
-# PREFERENCIAS
-# ─────────────────────────────────────────────────────
-
 async def obtener_preferencias(usuario_id: str) -> dict:
     db = _db()
     prefs = await db["preferencias_notificacion"].find_one({"usuarioId": usuario_id})
-    base = {
-        "usuarioId":               usuario_id,
-        "notificacionAsignacion":  True,
-        "notificacionVencimiento": True,
-        "notificacionComentario":  True,
-        "notificacionCambioEstado": True,
-        "canal": "IN_APP",
-        "telefonoWhatsapp": None,
-        "telefonoSms":      None,
+    if not prefs:
+        return {
+            "usuarioId": usuario_id,
+            "notificacionAsignacion":  True,
+            "notificacionVencimiento": True,
+            "notificacionComentario":  True,
+            "notificacionCambioEstado": True,
+            "canal": "IN_APP",
+        }
+    return {
+        "usuarioId":               prefs["usuarioId"],
+        "notificacionAsignacion":  prefs.get("notificacionAsignacion", True),
+        "notificacionVencimiento": prefs.get("notificacionVencimiento", True),
+        "notificacionComentario":  prefs.get("notificacionComentario", True),
+        "notificacionCambioEstado": prefs.get("notificacionCambioEstado", True),
+        "canal": prefs.get("canal", "IN_APP"),
     }
-    if prefs:
-        base.update({k: v for k, v in prefs.items() if k != "_id"})
-    return base
 
 
 async def actualizar_preferencias(usuario_id: str, datos: ActualizarPreferencias) -> dict:
@@ -246,62 +134,86 @@ async def actualizar_preferencias(usuario_id: str, datos: ActualizarPreferencias
     return await obtener_preferencias(usuario_id)
 
 
-async def actualizar_contacto_externo(
-    usuario_id: str,
-    telefono_whatsapp: str | None,
-    telefono_sms: str | None,
-) -> dict:
-    """Guarda los datos de contacto para canales externos."""
-    db = _db()
-    cambios = {"usuarioId": usuario_id}
-    if telefono_whatsapp is not None:
-        cambios["telefonoWhatsapp"] = telefono_whatsapp
-    if telefono_sms is not None:
-        cambios["telefonoSms"] = telefono_sms
-    await db["preferencias_notificacion"].update_one(
-        {"usuarioId": usuario_id}, {"$set": cambios}, upsert=True
-    )
-    return await obtener_preferencias(usuario_id)
-
-
-# ─────────────────────────────────────────────────────
-# ENVÍO EXTERNO MANUAL (endpoint admin/PM)
-# ─────────────────────────────────────────────────────
-
 async def enviar_notificacion_externa(
     usuario_id: str,
     mensaje: str,
     canal: str = "email",
-    asunto: str = "Notificación TaskFlow",
+    asunto: str = "Notificacion TaskFlow",
+    contacto_directo: str | None = None,
 ) -> dict:
     """
-    Envía manualmente una notificación por canal externo.
-    Usa Factory Method + Adapter exactamente como en el ejemplo bancario:
-      1. ProveedorNotificacion.get(canal) → fábrica concreta
-      2. fabrica.get()                    → adaptador concreto
-      3. adapter.enviar(solicitud)        → API externa
+    Envia una notificacion por canal externo.
+    Patron: Factory Method + Adapter (igual que el ejemplo bancario).
+
+    contacto_directo: numero de telefono para WhatsApp/SMS enviado desde el frontend.
+    Si no se provee, intenta obtenerlo de las preferencias del usuario.
     """
     db = _db()
     usuario = await db["usuarios"].find_one({"_id": usuario_id})
     if not usuario:
         return {"enviada": False, "canal": canal, "detalle": "Usuario no encontrado"}
 
-    resultado = await _enviar_por_canal_externo(db, usuario, mensaje, canal, asunto)
+    # Resolver contacto segun el canal
+    if canal == "email":
+        contacto = usuario.get("email", "")
+    else:
+        # WhatsApp / SMS: prioridad: (1) enviado directo, (2) guardado en prefs, (3) aviso
+        prefs = await db["preferencias_notificacion"].find_one({"usuarioId": usuario_id}) or {}
+        if contacto_directo and contacto_directo.strip():
+            contacto = contacto_directo.strip()
+        elif canal == "whatsapp" and prefs.get("telefonoWhatsapp"):
+            contacto = prefs["telefonoWhatsapp"]
+        elif canal == "sms" and prefs.get("telefonoSms"):
+            contacto = prefs["telefonoSms"]
+        else:
+            # Sin numero configurado — simular con log descriptivo
+            contacto = "sin-numero"
 
-    # Registrar también como notificación interna
-    await crear_notificacion_interna(
-        db, usuario_id,
-        f"[{canal.upper()}] {mensaje}",
-        "NOTIFICACION_EXTERNA",
-    )
+    try:
+        # Paso 1 — Factory Method: obtener fabrica del canal
+        fabrica = _proveedor_notificacion.get(canal)
 
-    return resultado
+        # Paso 2 — Factory Method: crear adaptador concreto
+        adapter = fabrica.get()
+
+        # Paso 3 — Adapter: traducir y enviar
+        solicitud = SolicitudNotificacion(
+            destinatario=usuario.get("nombre", "Usuario"),
+            contacto=contacto,
+            mensaje=mensaje,
+            asunto=asunto,
+        )
+        respuesta = adapter.enviar(solicitud)
+
+        # Registrar como notificacion interna
+        await crear_notificacion_interna(
+            db, usuario_id,
+            f"[{canal.upper()}] {mensaje}",
+            "NOTIFICACION_EXTERNA",
+        )
+
+        return {
+            "enviada":       respuesta.enviada,
+            "canal":         respuesta.canal,
+            "detalle":       respuesta.detalle,
+            "contacto_usado": contacto,
+        }
+    except ValueError as e:
+        return {"enviada": False, "canal": canal, "detalle": str(e)}
+    except Exception as e:
+        return {"enviada": False, "canal": canal, "detalle": f"Error: {str(e)}"}
 
 
-async def probar_canales(usuario_id: str, mensaje: str = "Prueba de canal TaskFlow") -> dict:
+
+async def probar_canales(
+    usuario_id: str,
+    mensaje: str = "Prueba de canal TaskFlow",
+    contacto_whatsapp: str | None = None,
+    contacto_sms: str | None = None,
+) -> dict:
     """
-    Prueba todos los canales disponibles para un usuario.
-    Útil para verificar la configuración de contacto.
+    Prueba los 3 canales disponibles en paralelo para un usuario.
+    Retorna el resultado individual de cada canal.
     """
     db = _db()
     usuario = await db["usuarios"].find_one({"_id": usuario_id})
@@ -310,8 +222,20 @@ async def probar_canales(usuario_id: str, mensaje: str = "Prueba de canal TaskFl
 
     canales = _proveedor_notificacion.canales_disponibles()
     resultados = {}
+
     for canal in canales:
-        resultados[canal] = await _enviar_por_canal_externo(
-            db, usuario, mensaje, canal, f"Prueba TaskFlow — canal {canal}"
+        contacto_dir = None
+        if canal == "whatsapp" and contacto_whatsapp:
+            contacto_dir = contacto_whatsapp
+        elif canal == "sms" and contacto_sms:
+            contacto_dir = contacto_sms
+
+        resultados[canal] = await enviar_notificacion_externa(
+            usuario_id=usuario_id,
+            mensaje=mensaje,
+            canal=canal,
+            asunto=f"Prueba TaskFlow - canal {canal}",
+            contacto_directo=contacto_dir,
         )
+
     return {"usuarioId": usuario_id, "resultados": resultados}

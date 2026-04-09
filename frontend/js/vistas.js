@@ -645,9 +645,17 @@ async function cargarNotificaciones() {
   const btnMarcar = document.getElementById("btnMarcarLeidas");
 
   // Admin solo ve la tabla global; el resto ve sus propias notificaciones
+  const panelEnvio = document.getElementById("panelEnvioExterno");
+  const esAdminOPM =
+    esAdmin || (S && S.usuario && S.usuario.rol === "PROJECT_MANAGER");
+
   if (panelAdmin) panelAdmin.style.display = esAdmin ? "" : "none";
   if (panelMio) panelMio.style.display = esAdmin ? "none" : "";
   if (btnMarcar) btnMarcar.style.display = esAdmin ? "none" : "";
+  if (panelEnvio) panelEnvio.style.display = esAdminOPM ? "" : "none";
+
+  // Cargar usuarios para el selector del panel de envío
+  if (esAdminOPM) _notifCargarDestinatarios();
 
   if (!esAdmin) {
     // Vista normal: mis notificaciones + preferencias
@@ -755,104 +763,27 @@ async function marcarLeida(id) {
 }
 
 async function marcarTodasLeidas() {
-  if (!confirm("¿Marcar todas las notificaciones como leídas?")) return;
   try {
-    await api("PUT", "/notificaciones/leer-todas");
+    const r = await api("PUT", "/notificaciones/leer-todas");
+    toast(r.mensaje);
     cargarNotificaciones();
-    toast("✓ Todas las notificaciones marcadas como leídas");
   } catch (e) {
     toast(e.message, "err");
-  }
-}
-
-async function cargarTodasNotificaciones() {
-  const esAdmin = S?.usuario?.rol === "ADMIN";
-  if (!esAdmin) {
-    toast("Acceso restringido", "err");
-    return;
-  }
-
-  const tbody = document.getElementById("tbTodasNotif");
-  tbody.innerHTML =
-    '<tr><td colspan="5" class="vacío"><span class="spinner"></span></td></tr>';
-
-  try {
-    const notifs = await api("GET", "/notificaciones/");
-
-    if (!notifs.length) {
-      tbody.innerHTML =
-        '<tr><td colspan="5" class="vacío">Sin notificaciones en el sistema</td></tr>';
-      return;
-    }
-
-    const mapaUsuarios = {};
-    for (const n of notifs) {
-      if (!mapaUsuarios[n.usuarioId]) {
-        try {
-          const usr = await api("GET", `/usuarios/${n.usuarioId}`);
-          mapaUsuarios[n.usuarioId] = usr.nombre;
-        } catch {
-          mapaUsuarios[n.usuarioId] = n.usuarioId.slice(-6);
-        }
-      }
-    }
-
-    tbody.innerHTML = notifs
-      .map(
-        (n) => `
-      <tr>
-        <td class="txt2">${n.mensaje}</td>
-        <td><span class="badge bm">${n.tipo}</span></td>
-        <td class="txt3">${mapaUsuarios[n.usuarioId] || n.usuarioId}</td>
-        <td><span class="badge ${n.leida ? "bg" : "br"}">${n.leida ? "Leída" : "Sin leer"}</span></td>
-        <td class="txt3" style="font-size:11px">${fFecha(n.creadoEn)}</td>
-      </tr>
-    `,
-      )
-      .join("");
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" class="vacío">Error: ${e.message}</td></tr>`;
   }
 }
 
 async function guardarPrefs() {
-  if (!S) return;
-
-  const prefs = {};
-
-  [
-    ["pn1", "notificacionAsignacion"],
-    ["pn2", "notificacionVencimiento"],
-    ["pn3", "notificacionComentario"],
-    ["pn4", "notificacionCambioEstado"],
-  ].forEach(([id, campo]) => {
-    const el = document.getElementById(id);
-    prefs[campo] = el?.classList.contains("on") ?? true;
-  });
-
-  const canalSelect = document.getElementById("canalNotif");
-  if (canalSelect) {
-    prefs.canal = canalSelect.value || "IN_APP";
-  } else {
-    prefs.canal = "IN_APP";
-  }
-
+  const on = (id) => document.getElementById(id)?.classList.contains("on");
   try {
-    await api("PUT", "/notificaciones/preferencias", prefs);
-    toast("✓ Preferencias guardadas");
+    await api("PUT", "/notificaciones/preferencias", {
+      notificacionAsignacion: on("pn1"),
+      notificacionVencimiento: on("pn2"),
+      notificacionComentario: on("pn3"),
+      notificacionCambioEstado: on("pn4"),
+    });
+    toast("Preferencias guardadas");
   } catch (e) {
     toast(e.message, "err");
-  }
-}
-
-function actualizarBadgeNotif(cantidad) {
-  const btn = document.getElementById("btnNotif");
-  if (!btn) return;
-
-  if (cantidad > 0) {
-    btn.innerHTML = `<i class="ph ph-bell-ringing"></i><span class="badge" style="position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;background:var(--red);color:white;border-radius:50%;font-weight:500">${cantidad > 99 ? "99+" : cantidad}</span>`;
-  } else {
-    btn.innerHTML = '<i class="ph ph-bell"></i>';
   }
 }
 
@@ -1394,6 +1325,354 @@ async function crearUsuario() {
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = '<i class="ph ph-user-plus"></i> Crear usuario';
+    }
+  }
+}
+
+/* === NOTIFICACIONES EXTERNAS === */
+
+const _CANAL_INFO = {
+  email: { fabrica: "FabricaEmail", adapter: "EmailAdaptee", api: "EmailAPI" },
+  whatsapp: {
+    fabrica: "FabricaWhatsApp",
+    adapter: "WhatsAppAdaptee",
+    api: "WhatsAppAPI",
+  },
+  sms: { fabrica: "FabricaSms", adapter: "SmsAdaptee", api: "SmsAPI" },
+};
+
+function seleccionarCanalNotif(el) {
+  document
+    .querySelectorAll(".notif-canal")
+    .forEach((c) => c.classList.remove("activo"));
+  el.classList.add("activo");
+  const canal = el.dataset.canal;
+  const info = _CANAL_INFO[canal] || {};
+  const set = (id, val) => {
+    const e = document.getElementById(id);
+    if (e) e.textContent = val;
+  };
+  set("flujoCanal", canal);
+  set("flujoFabrica", info.fabrica || "");
+  set("flujoAdapter", info.adapter || "");
+  set("flujoApi", info.api || "");
+}
+
+async function _cargarUsuariosParaNotif() {
+  const sel = document.getElementById("notifDestinatario");
+  if (!sel || sel.options.length > 1) return;
+  try {
+    const us = await api("GET", "/usuarios/");
+    sel.innerHTML =
+      '<option value="">Selecciona usuario</option>' +
+      us
+        .map(
+          (u) =>
+            '<option value="' +
+            u.id +
+            '">' +
+            u.nombre +
+            " (" +
+            u.email +
+            ")</option>",
+        )
+        .join("");
+  } catch (_) {}
+}
+
+async function enviarNotificacionExterna() {
+  const canalEl = document.querySelector(".notif-canal.activo");
+  const canal = canalEl ? canalEl.dataset.canal : "email";
+  const userId = document.getElementById("notifDestinatario")
+    ? document.getElementById("notifDestinatario").value
+    : "";
+  const msgEl = document.getElementById("notifMensaje");
+  const mensaje = msgEl ? msgEl.value.trim() : "";
+  const asuntoEl = document.getElementById("notifAsunto");
+  const asunto = asuntoEl ? asuntoEl.value.trim() : "Notificacion TaskFlow";
+  const resEl = document.getElementById("notifEnvioResultado");
+
+  if (!userId) {
+    toast("Selecciona un destinatario", "err");
+    return;
+  }
+  if (!mensaje) {
+    toast("Escribe un mensaje", "err");
+    return;
+  }
+
+  if (resEl) resEl.innerHTML = '<span class="spinner"></span> Enviando...';
+
+  try {
+    // Obtener telefono si es WhatsApp o SMS
+    const telEl = document.getElementById("nTelefono");
+    const telefono =
+      (canal === "whatsapp" || canal === "sms") && telEl
+        ? telEl.value.trim()
+        : null;
+
+    const body = {
+      canal,
+      usuarioId: userId,
+      mensaje,
+      asunto: asunto || "Notificacion TaskFlow",
+    };
+    if (telefono) body.contacto = telefono;
+
+    const r = await api("POST", "/notificaciones/enviar-externo", body);
+    if (resEl) {
+      if (resp.enviada) {
+        resEl.innerHTML =
+          '<span style="color:var(--green)">Enviado por ' +
+          resp.canal +
+          " - " +
+          resp.detalle +
+          "</span>";
+      } else {
+        resEl.innerHTML =
+          '<span style="color:var(--red)">No enviado - ' +
+          resp.detalle +
+          "</span>";
+      }
+    }
+    toast(
+      resp.enviada
+        ? "Notificacion enviada por " + resp.canal
+        : "No se pudo enviar: " + resp.detalle,
+      resp.enviada ? "ok" : "err",
+    );
+    if (msgEl) msgEl.value = "";
+  } catch (e) {
+    if (resEl)
+      resEl.innerHTML =
+        '<span style="color:var(--red)">Error: ' + e.message + "</span>";
+    toast(e.message, "err");
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   NOTIFICACIONES EXTERNAS — Panel inline
+   Factory Method + Adapter
+══════════════════════════════════════════════════ */
+
+const _NOTIF_FLOW = {
+  email: { fabrica: "FabricaEmail", adapter: "EmailAdaptee", api: "EmailAPI" },
+  whatsapp: {
+    fabrica: "FabricaWhatsApp",
+    adapter: "WhatsAppAdaptee",
+    api: "WhatsAppAPI",
+  },
+  sms: { fabrica: "FabricaSms", adapter: "SmsAdaptee", api: "SmsAPI" },
+};
+
+function notifSelCanal(el) {
+  document
+    .querySelectorAll(".ncanal-opt")
+    .forEach((c) => c.classList.remove("activo"));
+  el.classList.add("activo");
+  const canal = el.dataset.canal;
+  const flow = _NOTIF_FLOW[canal] || {};
+
+  // Actualizar flujo visual
+  const set = (id, val) => {
+    const e = document.getElementById(id);
+    if (e) e.textContent = val;
+  };
+  set("nflujoCanal", canal);
+  set("nflujoFabrica", flow.fabrica || "");
+  set("nflujoAdapter", flow.adapter || "");
+  set("nflujoApi", flow.api || "");
+
+  // Mostrar campo de telefono para WhatsApp y SMS
+  const telWrap = document.getElementById("nTelWrap");
+  const telLabel = document.getElementById("nTelLabel");
+  const asuntoFg =
+    document.getElementById("nAsunto") &&
+    document.getElementById("nAsunto").closest(".fg");
+  if (telWrap) {
+    const necesitaTel = canal === "whatsapp" || canal === "sms";
+    telWrap.style.display = necesitaTel ? "" : "none";
+    if (telLabel)
+      telLabel.textContent =
+        canal === "whatsapp" ? "Numero de WhatsApp" : "Numero de SMS";
+  }
+  // Ocultar asunto cuando no es email
+  if (asuntoFg) asuntoFg.style.display = canal === "email" ? "" : "none";
+}
+
+async function _notifCargarDestinatarios() {
+  const sel = document.getElementById("nDestinatario");
+  if (!sel || sel.options.length > 1) return;
+  try {
+    const us = await api("GET", "/usuarios/activos");
+    sel.innerHTML =
+      '<option value="">— Selecciona destinatario —</option>' +
+      us
+        .map(
+          (u) =>
+            '<option value="' +
+            u.id +
+            '">' +
+            u.nombre +
+            " · " +
+            u.rol +
+            " (" +
+            u.email +
+            ")</option>",
+        )
+        .join("");
+  } catch (_) {}
+}
+
+async function notifEnviar() {
+  const canalEl = document.querySelector(".ncanal-opt.activo");
+  const canal = canalEl ? canalEl.dataset.canal : "email";
+  const userId = document.getElementById("nDestinatario")
+    ? document.getElementById("nDestinatario").value
+    : "";
+  const msgEl = document.getElementById("nMensaje");
+  const mensaje = msgEl ? msgEl.value.trim() : "";
+  const asuntoEl = document.getElementById("nAsunto");
+  const asunto = asuntoEl ? asuntoEl.value.trim() : "Notificacion TaskFlow";
+  const telEl = document.getElementById("nTelefono");
+  const telefono =
+    (canal === "whatsapp" || canal === "sms") && telEl
+      ? telEl.value.trim()
+      : null;
+  const resEl = document.getElementById("nResultado");
+  const errEl = document.getElementById("nError");
+  const btn = document.getElementById("btnEnviarNotif");
+
+  if (errEl) errEl.textContent = "";
+  if (resEl) resEl.textContent = "";
+
+  if (!userId) {
+    if (errEl) errEl.textContent = "Selecciona un destinatario";
+    return;
+  }
+  if (!mensaje) {
+    if (errEl) errEl.textContent = "Escribe un mensaje";
+    return;
+  }
+  if ((canal === "whatsapp" || canal === "sms") && !telefono) {
+    if (errEl)
+      errEl.textContent = "Ingresa el numero de telefono para " + canal;
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Enviando...';
+  }
+  if (resEl) resEl.innerHTML = '<span class="spinner"></span> Procesando...';
+
+  try {
+    const cuerpo = {
+      canal,
+      usuarioId: userId,
+      mensaje,
+      asunto: asunto || "Notificacion TaskFlow",
+    };
+    if (telefono) cuerpo.contacto = telefono;
+
+    const r = await api("POST", "/notificaciones/enviar-externo", cuerpo);
+
+    const ok = r.enviada;
+    const ico = ok
+      ? '<i class="ph ph-check-circle" style="color:var(--green)"></i>'
+      : '<i class="ph ph-x-circle" style="color:var(--red)"></i>';
+
+    if (resEl) {
+      resEl.innerHTML =
+        ico +
+        " <strong>" +
+        (ok ? "Enviado" : "No enviado") +
+        "</strong> por " +
+        (r.canal || canal) +
+        " · " +
+        (r.detalle || "") +
+        (r.contacto_usado ? " → " + r.contacto_usado : "");
+    }
+    toast(
+      ok
+        ? "Notificacion enviada por " + canal
+        : "No se pudo enviar: " + (r.detalle || ""),
+      ok ? "ok" : "err",
+    );
+    if (msgEl && ok) msgEl.value = "";
+  } catch (e) {
+    if (errEl) errEl.textContent = e.message;
+    if (resEl)
+      resEl.innerHTML =
+        '<i class="ph ph-x-circle" style="color:var(--red)"></i> Error: ' +
+        e.message;
+    toast(e.message, "err");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML =
+        '<i class="ph ph-paper-plane-tilt"></i> Enviar notificacion';
+    }
+  }
+}
+
+async function notifProbarTodos() {
+  const userId =
+    document.getElementById("nDestinatario") &&
+    document.getElementById("nDestinatario").value;
+  const errEl = document.getElementById("nError");
+  const resEl = document.getElementById("nResultado");
+  const btn = document.getElementById("btnProbarCanales");
+
+  if (!userId) {
+    if (errEl) errEl.textContent = "Selecciona un destinatario";
+    return;
+  }
+  if (errEl) errEl.textContent = "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Probando...';
+  }
+  if (resEl)
+    resEl.innerHTML = '<span class="spinner"></span> Probando los 3 canales...';
+
+  try {
+    const telEl2 = document.getElementById("nTelefono");
+    const telVal = telEl2 ? telEl2.value.trim() : "";
+    const bodyProbar = { usuarioId: userId };
+    if (telVal) {
+      bodyProbar.contactoWhatsapp = telVal;
+      bodyProbar.contactoSms = telVal;
+    }
+
+    const r = await api("POST", "/notificaciones/probar-canales", bodyProbar);
+    const resultados = Object.entries(r.resultados || {});
+    if (resEl) {
+      resEl.innerHTML = resultados
+        .map(([canal, res]) => {
+          const ok = res.enviada;
+          return (
+            '<span style="margin-right:12px">' +
+            (ok
+              ? '<i class="ph ph-check-circle" style="color:var(--green)"></i>'
+              : '<i class="ph ph-x-circle" style="color:var(--red)"></i>') +
+            " <strong>" +
+            canal.toUpperCase() +
+            "</strong>: " +
+            (res.detalle || "") +
+            "</span>"
+          );
+        })
+        .join("");
+    }
+    toast("Prueba de 3 canales completada");
+  } catch (e) {
+    if (errEl) errEl.textContent = e.message;
+    toast(e.message, "err");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ph ph-broadcast"></i> Probar todos';
     }
   }
 }
