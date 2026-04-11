@@ -136,5 +136,38 @@
         <div id="retencionMensaje" class="txt3" style="margin-top: 12px"></div>
       </div>
     </div>
+    <div class="hpanel" id="rpanel-exportar">
+      <div class="card">
+        <div class="card-t">
+          <i class="ph ph-bridge"></i> Exportación de reportes (Bridge)
+        </div>
+        <div class="frow" style="max-width: 760px">
+          <div class="fg">
+            <label class="flabel">Tipo de reporte</label>
+            <select class="fselect" id="expTipo">
+              <option value="tareas">Tareas</option>
+              <option value="auditoria">Auditoría</option>
+              <option value="equipo">Equipo</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="flabel">Formato de salida</label>
+            <select class="fselect" id="expFormato">
+              <option value="pdf">PDF</option>
+              <option value="csv">CSV</option>
+              <option value="json" selected>JSON</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex" style="justify-content: flex-end; margin-top: 12px">
+          <button
+            class="btn btn-primary btn-sm"
+            onclick="exportarReporteBridgeDesdeUI()"
+          >
+            <i class="ph ph-download-simple"></i> Exportar
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

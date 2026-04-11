@@ -432,6 +432,7 @@ const PAGINAS_HTML = {
       <button class="htab" onclick="cambiarTabReporte('equipo',this)"><i class="ph ph-users-three"></i> Equipo</button>
       <button class="htab" id="tabAuditGlobal" onclick="cambiarTabReporte('auditoria_global',this)" style="display:none"><i class="ph ph-shield-check"></i> Auditoría global</button>
       <button class="htab" id="tabRetencion" onclick="cambiarTabReporte('retencion',this)" style="display:none"><i class="ph ph-archive"></i> Retención</button>
+      <button class="htab" onclick="cambiarTabReporte('exportar',this)"><i class="ph ph-bridge"></i> Exportar</button>
     </div>
     <div class="hpanel activo" id="rpanel-metricas">
       <div class="stats-row">
@@ -471,6 +472,34 @@ const PAGINAS_HTML = {
         </div>
         <button class="btn btn-primary btn-sm" onclick="aplicarPoliticaRetencion()"><i class="ph ph-check"></i> Aplicar política</button>
         <div id="retencionMensaje" class="txt3" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="hpanel" id="rpanel-exportar">
+      <div class="card">
+        <div class="card-t"><i class="ph ph-bridge"></i> Exportación de reportes (Bridge)</div>
+        <div class="frow" style="max-width:760px">
+          <div class="fg">
+            <label class="flabel">Tipo de reporte</label>
+            <select class="fselect" id="expTipo">
+              <option value="tareas">Tareas</option>
+              <option value="auditoria">Auditoría</option>
+              <option value="equipo">Equipo</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="flabel">Formato de salida</label>
+            <select class="fselect" id="expFormato">
+              <option value="pdf">PDF</option>
+              <option value="csv">CSV</option>
+              <option value="json" selected>JSON</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex" style="justify-content:flex-end;margin-top:12px">
+          <button class="btn btn-primary btn-sm" onclick="exportarReporteBridgeDesdeUI()">
+            <i class="ph ph-download-simple"></i> Exportar
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -644,14 +673,26 @@ const PAGINAS_HTML = {
         <!-- Campo de teléfono — visible solo para WhatsApp/SMS -->
         <div class="fg" id="nTelWrap" style="display:none;margin-top:10px">
           <label class="flabel" id="nTelLabel">Número de WhatsApp</label>
-          <div style="position:relative">
-            <i class="ph ph-phone" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:15px;pointer-events:none"></i>
-            <input class="finput" id="nTelefono" placeholder="+57 300 000 0000"
-              style="padding-left:36px"
-              title="Incluye el código de país. Ej: +57 para Colombia">
+          <div class="nphone-row">
+            <select class="fselect" id="nCodPais" title="Código de país" style="max-width:110px">
+              <option value="+57" selected>🇨🇴 +57</option>
+              <option value="+34">🇪🇸 +34</option>
+              <option value="+52">🇲🇽 +52</option>
+              <option value="+54">🇦🇷 +54</option>
+              <option value="+51">🇵🇪 +51</option>
+              <option value="+56">🇨🇱 +56</option>
+              <option value="+58">🇻🇪 +58</option>
+              <option value="+1">🇺🇸 +1</option>
+            </select>
+            <div style="position:relative;flex:1">
+              <i class="ph ph-phone" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:15px;pointer-events:none"></i>
+              <input class="finput" id="nTelefono" placeholder="300 000 0000 o +57 3000000000"
+                style="padding-left:36px"
+                title="Puedes escribir el número separado o completo con código país">
+            </div>
           </div>
           <div style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono)">
-            Incluye código de país · Ej: +57 310 555 1234
+            Se normaliza automáticamente. Acepta número pegado o separado.
           </div>
         </div>
 

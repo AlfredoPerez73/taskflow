@@ -27,8 +27,17 @@
       <header class="topbar">
         <div class="topbar-logo">
           <div class="topbar-logo-icon">TF</div>
-          TaskFlow
+          <span class="topbar-logo-text">TaskFlow</span>
         </div>
+        <button
+          class="btn-sidebar-toggle"
+          id="btnSidebarToggle"
+          onclick="toggleSidebar()"
+          style="display: none"
+          title="Plegar/Desplegar menú"
+        >
+          <i class="ph ph-sidebar-simple"></i>
+        </button>
         <div class="topbar-sep" id="topSep" style="display: none"></div>
         <span id="topBreadcrumb" style="display: none"></span>
         <div class="topbar-right">

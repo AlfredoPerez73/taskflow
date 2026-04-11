@@ -440,6 +440,12 @@ async function exportarReporteBridge(tipo, formato) {
   }
 }
 
+function exportarReporteBridgeDesdeUI() {
+  const tipo = document.getElementById("expTipo")?.value || "tareas";
+  const formato = document.getElementById("expFormato")?.value || "json";
+  exportarReporteBridge(tipo, formato);
+}
+
 /* ══════════ HISTORIAL ══════════ */
 let historialUltimoCambio = null;
 
@@ -1601,6 +1607,70 @@ async function notifEnviar() {
       btn.disabled = false;
       btn.innerHTML =
         '<i class="ph ph-paper-plane-tilt"></i> Enviar notificación';
+    }
+  }
+}
+
+async function notifProbarTodos() {
+  const userId = document.getElementById("nDestinatario")?.value || "";
+  const telEl = document.getElementById("nTelefono");
+  const telefonoRaw = telEl ? telEl.value.trim() : "";
+  const codPais = document.getElementById("nCodPais")?.value || "+57";
+  const resEl = document.getElementById("nResultado");
+  const errEl = document.getElementById("nError");
+  const btn = document.getElementById("btnProbarCanales");
+
+  function normalizarTelefono(raw, codigo) {
+    const limpio = (raw || "").replace(/[^\d+]/g, "");
+    if (!limpio) return "";
+    if (limpio.startsWith("+")) return "+" + limpio.slice(1).replace(/\D/g, "");
+    const soloDigitos = limpio.replace(/\D/g, "");
+    const prefijo = (codigo || "+57").replace(/[^\d+]/g, "");
+    return `${prefijo}${soloDigitos}`;
+  }
+  const telefono = normalizarTelefono(telefonoRaw, codPais);
+
+  if (errEl) errEl.textContent = "";
+  if (resEl) resEl.textContent = "";
+  if (!userId) {
+    if (errEl) errEl.textContent = "Selecciona un destinatario";
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Probando...';
+  }
+  if (resEl) resEl.innerHTML = '<span class="spinner"></span> Probando canales...';
+
+  try {
+    const cuerpo = { usuarioId: userId };
+    if (telefono) {
+      cuerpo.contactoWhatsapp = telefono;
+      cuerpo.contactoSms = telefono;
+    }
+    const r = await api("POST", "/notificaciones/probar-canales", cuerpo);
+    const resultados = r.resultados || {};
+    const orden = ["email", "whatsapp", "sms"];
+    const html = orden
+      .filter((c) => resultados[c])
+      .map((c) => {
+        const x = resultados[c] || {};
+        const estado = (x.estado || "").toLowerCase();
+        const aceptado = ["accepted", "queued", "sending", "sent", "delivered"].includes(estado);
+        return `${aceptado ? "✅" : "❌"} ${c.toUpperCase()}: ${x.detalle || "sin detalle"}${x.contacto_usado ? ` · ${x.contacto_usado}` : ""}`;
+      })
+      .join(" · ");
+    if (resEl) resEl.textContent = html || "Sin resultados";
+    toast("Prueba de canales completada");
+  } catch (e) {
+    if (errEl) errEl.textContent = e.message;
+    if (resEl) resEl.textContent = `Error: ${e.message}`;
+    toast(e.message, "err");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ph ph-broadcast"></i> Probar todos';
     }
   }
 }

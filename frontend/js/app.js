@@ -73,6 +73,27 @@ function toggleTema() {
   aplicarTema(actual === "oscuro" ? "claro" : "oscuro");
 }
 
+/* ── SIDEBAR ── */
+function _aplicarSidebarColapsado(colapsado) {
+  const app = document.getElementById("app");
+  if (!app) return;
+  app.classList.toggle("sidebar-collapsed", !!colapsado);
+  localStorage.setItem("tf_sidebar_collapsed", colapsado ? "1" : "0");
+}
+
+function toggleSidebar() {
+  const app = document.getElementById("app");
+  if (!app || app.classList.contains("sin-sidebar")) return;
+  _aplicarSidebarColapsado(!app.classList.contains("sidebar-collapsed"));
+}
+
+function _restaurarEstadoSidebar() {
+  const app = document.getElementById("app");
+  if (!app || app.classList.contains("sin-sidebar")) return;
+  const guardado = localStorage.getItem("tf_sidebar_collapsed") === "1";
+  _aplicarSidebarColapsado(guardado);
+}
+
 /* ── NAVEGACIÓN ── */
 function mostrarPantalla(nombre) {
   document
@@ -163,8 +184,11 @@ function actualizarUI() {
     rol === "ADMIN" ? "" : "none";
   document.getElementById("navNotificaciones").style.display = "";
   document.getElementById("btnNotif").style.display = "";
+  const btnSidebar = document.getElementById("btnSidebarToggle");
+  if (btnSidebar) btnSidebar.style.display = "";
 
   document.getElementById("app").classList.remove("sin-sidebar");
+  _restaurarEstadoSidebar();
 }
 
 /* ── HELPERS ── */
@@ -298,6 +322,9 @@ function cerrarSesion() {
     if (el) el.style.display = "none";
   });
   document.getElementById("app").classList.add("sin-sidebar");
+  document.getElementById("app").classList.remove("sidebar-collapsed");
+  const btnSidebar = document.getElementById("btnSidebarToggle");
+  if (btnSidebar) btnSidebar.style.display = "none";
   document
     .querySelectorAll(".nav-item")
     .forEach((n) => n.classList.remove("activo"));
