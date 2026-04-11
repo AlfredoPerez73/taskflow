@@ -7,10 +7,8 @@ from app.schemas.notificaciones import ActualizarPreferencias
 from app.patterns.adapter.notificacion_adapter import SolicitudNotificacion
 from app.patterns.adapter.proveedor_notificacion import ProveedorNotificacion
 
-# Instancia única del proveedor (reutilizable)
 _proveedor_notificacion = ProveedorNotificacion()
-# gestor_eventos es opcional (SSE en tiempo real)
-# Si no existe el archivo, las notificaciones funcionan igual (solo sin push)
+
 try:
     from app.core.gestor_eventos import gestor_eventos, evento_notificacion
     _SSE_ACTIVO = True
@@ -26,15 +24,14 @@ def _db():
 
 def _serializar(doc: dict) -> dict:
     return {
-        "id":         doc["_id"],
-        "usuarioId":  doc["usuarioId"],
-        "mensaje":    doc["mensaje"],
-        "tipo":       doc["tipo"],
-        "leida":      doc.get("leida", False),
-        "creadoEn":   doc["creadoEn"],
-        # Metadatos de navegación — pueden ser None para notificaciones antiguas
-        "tareaId":    doc.get("tareaId"),
-        "proyectoId": doc.get("proyectoId"),
+        "id":          doc["_id"],
+        "usuarioId":   doc["usuarioId"],
+        "mensaje":     doc["mensaje"],
+        "tipo":        doc["tipo"],
+        "leida":       doc.get("leida", False),
+        "creadoEn":    doc["creadoEn"],
+        "tareaId":     doc.get("tareaId"),
+        "proyectoId":  doc.get("proyectoId"),
         "tituloTarea": doc.get("tituloTarea"),
     }
 
@@ -49,10 +46,6 @@ async def crear_notificacion_interna(
     proyecto_id: str | None = None,
     titulo_tarea: str | None = None,
 ) -> None:
-    """
-    Crea una notificación interna con metadatos opcionales de navegación.
-    Incluir tarea_id y proyecto_id permite al frontend navegar directo a la tarea.
-    """
     notif = {
         "_id":         str(uuid.uuid4()),
         "usuarioId":   usuario_id,
@@ -107,7 +100,7 @@ async def obtener_preferencias(usuario_id: str) -> dict:
     prefs = await db["preferencias_notificacion"].find_one({"usuarioId": usuario_id})
     if not prefs:
         return {
-            "usuarioId": usuario_id,
+            "usuarioId":               usuario_id,
             "notificacionAsignacion":  True,
             "notificacionVencimiento": True,
             "notificacionComentario":  True,
@@ -142,41 +135,52 @@ async def enviar_notificacion_externa(
     contacto_directo: str | None = None,
 ) -> dict:
     """
-    Envia una notificacion por canal externo.
-    Patron: Factory Method + Adapter (igual que el ejemplo bancario).
+    Envía notificación por canal externo usando Factory Method + Adapter.
 
-    contacto_directo: numero de telefono para WhatsApp/SMS enviado desde el frontend.
-    Si no se provee, intenta obtenerlo de las preferencias del usuario.
+    CORRECCIÓN: contacto_directo tiene prioridad absoluta.
+    Si no viene contacto_directo, busca en preferencias guardadas.
+    Si tampoco hay ahí, devuelve error claro en vez de "sin-numero".
     """
     db = _db()
     usuario = await db["usuarios"].find_one({"_id": usuario_id})
     if not usuario:
         return {"enviada": False, "canal": canal, "detalle": "Usuario no encontrado"}
 
-    # Resolver contacto segun el canal
+    # ── Resolver contacto según el canal ──────────────────────────────────
     if canal == "email":
+        # Email siempre usa el correo del usuario registrado
         contacto = usuario.get("email", "")
+        if not contacto:
+            return {"enviada": False, "canal": canal, "detalle": "El usuario no tiene email registrado"}
+
     else:
-        # WhatsApp / SMS: prioridad: (1) enviado directo, (2) guardado en prefs, (3) aviso
-        prefs = await db["preferencias_notificacion"].find_one({"usuarioId": usuario_id}) or {}
-        if contacto_directo and contacto_directo.strip():
-            contacto = contacto_directo.strip()
-        elif canal == "whatsapp" and prefs.get("telefonoWhatsapp"):
-            contacto = prefs["telefonoWhatsapp"]
-        elif canal == "sms" and prefs.get("telefonoSms"):
-            contacto = prefs["telefonoSms"]
+        # WhatsApp / SMS: prioridad (1) contacto_directo, (2) preferencias BD
+        contacto_directo_limpio = (contacto_directo or "").strip()
+
+        if contacto_directo_limpio:
+            # El frontend envió el número — usarlo directamente
+            contacto = contacto_directo_limpio
         else:
-            # Sin numero configurado — simular con log descriptivo
-            contacto = "sin-numero"
+            # Buscar en preferencias guardadas del usuario
+            prefs = await db["preferencias_notificacion"].find_one({"usuarioId": usuario_id}) or {}
+            if canal == "whatsapp" and prefs.get("telefonoWhatsapp"):
+                contacto = prefs["telefonoWhatsapp"]
+            elif canal == "sms" and prefs.get("telefonoSms"):
+                contacto = prefs["telefonoSms"]
+            else:
+                # Sin número disponible — error claro, no "sin-numero"
+                return {
+                    "enviada": False,
+                    "canal": canal,
+                    "detalle": f"No hay número de teléfono configurado para {canal.upper()}. "
+                               f"Ingresa el número en el campo de teléfono.",
+                    "contacto_usado": None,
+                }
 
+    # ── Ejecutar Factory Method + Adapter ────────────────────────────────
     try:
-        # Paso 1 — Factory Method: obtener fabrica del canal
         fabrica = _proveedor_notificacion.get(canal)
-
-        # Paso 2 — Factory Method: crear adaptador concreto
         adapter = fabrica.get()
-
-        # Paso 3 — Adapter: traducir y enviar
         solicitud = SolicitudNotificacion(
             destinatario=usuario.get("nombre", "Usuario"),
             contacto=contacto,
@@ -185,7 +189,7 @@ async def enviar_notificacion_externa(
         )
         respuesta = adapter.enviar(solicitud)
 
-        # Registrar como notificacion interna
+        # Registrar como notificación interna
         await crear_notificacion_interna(
             db, usuario_id,
             f"[{canal.upper()}] {mensaje}",
@@ -193,9 +197,9 @@ async def enviar_notificacion_externa(
         )
 
         return {
-            "enviada":       respuesta.enviada,
-            "canal":         respuesta.canal,
-            "detalle":       respuesta.detalle,
+            "enviada":        respuesta.enviada,
+            "canal":          respuesta.canal,
+            "detalle":        respuesta.detalle,
             "contacto_usado": contacto,
         }
     except ValueError as e:
@@ -204,17 +208,12 @@ async def enviar_notificacion_externa(
         return {"enviada": False, "canal": canal, "detalle": f"Error: {str(e)}"}
 
 
-
 async def probar_canales(
     usuario_id: str,
     mensaje: str = "Prueba de canal TaskFlow",
     contacto_whatsapp: str | None = None,
     contacto_sms: str | None = None,
 ) -> dict:
-    """
-    Prueba los 3 canales disponibles en paralelo para un usuario.
-    Retorna el resultado individual de cada canal.
-    """
     db = _db()
     usuario = await db["usuarios"].find_one({"_id": usuario_id})
     if not usuario:

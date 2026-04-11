@@ -391,6 +391,47 @@ async function cargarReporte(proyId) {
   }
 }
 
+async function exportarReporteBridge(tipo, formato) {
+  const proyId = document.getElementById("selReporteProy")?.value;
+  if (!proyId) {
+    toast("Selecciona un proyecto primero", "err");
+    return;
+  }
+  try {
+    const ruta = `/proyectos/${proyId}/exportar?tipo=${encodeURIComponent(tipo)}&formato=${encodeURIComponent(formato)}`;
+    const resp = await fetch(`${API}${ruta}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${S?.token_acceso || ""}`,
+      },
+    });
+    if (!resp.ok) {
+      let detalle = "Error al exportar reporte";
+      try {
+        const d = await resp.json();
+        detalle = d.detail || detalle;
+      } catch {}
+      throw new Error(detalle);
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename="([^"]+)"/i);
+    const nombre = m?.[1] || `${tipo}.${formato}`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("Reporte exportado correctamente");
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
 /* ══════════ HISTORIAL ══════════ */
 let historialUltimoCambio = null;
 
@@ -1525,27 +1566,34 @@ async function _notifCargarDestinatarios() {
 }
 
 async function notifEnviar() {
+  // Leer canal seleccionado
   const canalEl = document.querySelector(".ncanal-opt.activo");
   const canal = canalEl ? canalEl.dataset.canal : "email";
-  const userId = document.getElementById("nDestinatario")
-    ? document.getElementById("nDestinatario").value
-    : "";
+
+  // Leer destinatario
+  const userId = document.getElementById("nDestinatario")?.value || "";
+
+  // Leer mensaje
   const msgEl = document.getElementById("nMensaje");
   const mensaje = msgEl ? msgEl.value.trim() : "";
+
+  // Leer asunto (solo email)
   const asuntoEl = document.getElementById("nAsunto");
   const asunto = asuntoEl ? asuntoEl.value.trim() : "Notificacion TaskFlow";
+
+  // Leer teléfono (WhatsApp / SMS) — CORRECCIÓN: leer siempre el valor actual
   const telEl = document.getElementById("nTelefono");
-  const telefono =
-    (canal === "whatsapp" || canal === "sms") && telEl
-      ? telEl.value.trim()
-      : null;
+  const telefono = telEl ? telEl.value.trim() : "";
+
   const resEl = document.getElementById("nResultado");
   const errEl = document.getElementById("nError");
   const btn = document.getElementById("btnEnviarNotif");
 
+  // Limpiar mensajes anteriores
   if (errEl) errEl.textContent = "";
   if (resEl) resEl.textContent = "";
 
+  // Validaciones
   if (!userId) {
     if (errEl) errEl.textContent = "Selecciona un destinatario";
     return;
@@ -1554,12 +1602,14 @@ async function notifEnviar() {
     if (errEl) errEl.textContent = "Escribe un mensaje";
     return;
   }
+  // Para WhatsApp y SMS exigir número
   if ((canal === "whatsapp" || canal === "sms") && !telefono) {
     if (errEl)
-      errEl.textContent = "Ingresa el numero de telefono para " + canal;
+      errEl.textContent = `Ingresa el número de teléfono para ${canal.toUpperCase()} (incluye código de país, ej: +573001234567)`;
     return;
   }
 
+  // Deshabilitar botón mientras envía
   if (btn) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Enviando...';
@@ -1567,13 +1617,16 @@ async function notifEnviar() {
   if (resEl) resEl.innerHTML = '<span class="spinner"></span> Procesando...';
 
   try {
+    // Construir body — siempre enviar contacto para WhatsApp/SMS
     const cuerpo = {
       canal,
       usuarioId: userId,
       mensaje,
       asunto: asunto || "Notificacion TaskFlow",
     };
-    if (telefono) cuerpo.contacto = telefono;
+    if (canal === "whatsapp" || canal === "sms") {
+      cuerpo.contacto = telefono; // CORRECCIÓN: siempre incluir el número
+    }
 
     const r = await api("POST", "/notificaciones/enviar-externo", cuerpo);
 
@@ -1584,42 +1637,36 @@ async function notifEnviar() {
 
     if (resEl) {
       resEl.innerHTML =
-        ico +
-        " <strong>" +
-        (ok ? "Enviado" : "No enviado") +
-        "</strong> por " +
-        (r.canal || canal) +
-        " · " +
-        (r.detalle || "") +
-        (r.contacto_usado ? " → " + r.contacto_usado : "");
+        `${ico} <strong>${ok ? "Enviado" : "No enviado"}</strong> por ${r.canal || canal}` +
+        ` · ${r.detalle || ""}` +
+        (r.contacto_usado ? ` → ${r.contacto_usado}` : "");
     }
+
     toast(
       ok
-        ? "Notificacion enviada por " + canal
-        : "No se pudo enviar: " + (r.detalle || ""),
+        ? `Notificación enviada por ${canal}`
+        : `No se pudo enviar: ${r.detalle || "error"}`,
       ok ? "ok" : "err",
     );
+
+    // Limpiar mensaje si se envió correctamente
     if (msgEl && ok) msgEl.value = "";
   } catch (e) {
     if (errEl) errEl.textContent = e.message;
     if (resEl)
-      resEl.innerHTML =
-        '<i class="ph ph-x-circle" style="color:var(--red)"></i> Error: ' +
-        e.message;
+      resEl.innerHTML = `<i class="ph ph-x-circle" style="color:var(--red)"></i> Error: ${e.message}`;
     toast(e.message, "err");
   } finally {
     if (btn) {
       btn.disabled = false;
       btn.innerHTML =
-        '<i class="ph ph-paper-plane-tilt"></i> Enviar notificacion';
+        '<i class="ph ph-paper-plane-tilt"></i> Enviar notificación';
     }
   }
 }
 
 async function notifProbarTodos() {
-  const userId =
-    document.getElementById("nDestinatario") &&
-    document.getElementById("nDestinatario").value;
+  const userId = document.getElementById("nDestinatario")?.value || "";
   const errEl = document.getElementById("nError");
   const resEl = document.getElementById("nResultado");
   const btn = document.getElementById("btnProbarCanales");
@@ -1628,6 +1675,11 @@ async function notifProbarTodos() {
     if (errEl) errEl.textContent = "Selecciona un destinatario";
     return;
   }
+
+  // Leer teléfono del campo visible
+  const telEl = document.getElementById("nTelefono");
+  const telVal = telEl ? telEl.value.trim() : "";
+
   if (errEl) errEl.textContent = "";
   if (btn) {
     btn.disabled = true;
@@ -1637,9 +1689,8 @@ async function notifProbarTodos() {
     resEl.innerHTML = '<span class="spinner"></span> Probando los 3 canales...';
 
   try {
-    const telEl2 = document.getElementById("nTelefono");
-    const telVal = telEl2 ? telEl2.value.trim() : "";
     const bodyProbar = { usuarioId: userId };
+    // CORRECCIÓN: enviar el teléfono para ambos canales si está disponible
     if (telVal) {
       bodyProbar.contactoWhatsapp = telVal;
       bodyProbar.contactoSms = telVal;
@@ -1647,24 +1698,24 @@ async function notifProbarTodos() {
 
     const r = await api("POST", "/notificaciones/probar-canales", bodyProbar);
     const resultados = Object.entries(r.resultados || {});
+
     if (resEl) {
       resEl.innerHTML = resultados
         .map(([canal, res]) => {
           const ok = res.enviada;
           return (
-            '<span style="margin-right:12px">' +
+            `<span style="margin-right:12px">` +
             (ok
               ? '<i class="ph ph-check-circle" style="color:var(--green)"></i>'
               : '<i class="ph ph-x-circle" style="color:var(--red)"></i>') +
-            " <strong>" +
-            canal.toUpperCase() +
-            "</strong>: " +
-            (res.detalle || "") +
-            "</span>"
+            ` <strong>${canal.toUpperCase()}</strong>: ${res.detalle || ""}` +
+            (res.contacto_usado ? ` → ${res.contacto_usado}` : "") +
+            `</span>`
           );
         })
-        .join("");
+        .join("<br>");
     }
+
     toast("Prueba de 3 canales completada");
   } catch (e) {
     if (errEl) errEl.textContent = e.message;

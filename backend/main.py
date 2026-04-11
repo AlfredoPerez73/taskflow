@@ -40,6 +40,7 @@ API REST desarrollada con **FastAPI** y **MongoDB Atlas**.
 | **Prototype** | `patterns/prototype/` | Clona tareas y proyectos con nuevos IDs |
 | **Builder** | `patterns/builder/` | Construye tareas complejas y subtareas paso a paso |
 | **Adapter** | `patterns/adapter/` | Traduce notificaciones a Email/WhatsApp/SMS |
+| **Bridge** | `patterns/bridge/` | Exporta reportes separando tipo de reporte y formato de salida |
 
 ### Autenticación
 

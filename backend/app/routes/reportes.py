@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import Response
 from typing import List
 from app.schemas.reportes import (
     GuardarFiltro, ActualizarConfiguracion,
@@ -8,6 +9,14 @@ from app.schemas.reportes import (
 from app.services import servicio_reporte
 from app.core.dependencias import obtener_usuario_actual, requerir_rol
 from app.patterns.abstract_factory.fabrica_temas import listar_temas
+from app.patterns.bridge.puente_exportacion import (
+    ExportadorCSV,
+    ExportadorJSON,
+    ExportadorPDF,
+    ReporteAuditoria,
+    ReporteEquipo,
+    ReporteTareas,
+)
 
 enrutador = APIRouter(tags=["Reportes y Configuración"])
 
@@ -78,3 +87,42 @@ async def obtener_config(_: dict = Depends(obtener_usuario_actual)):
     description="Modifica los parámetros globales de la plataforma. **Solo ADMIN.**")
 async def actualizar_config(datos: ActualizarConfiguracion, _: dict = Depends(requerir_rol("ADMIN"))):
     return await servicio_reporte.actualizar_configuracion(datos)
+
+
+@enrutador.get(
+    "/proyectos/{proyecto_id}/exportar",
+    summary="Exportar reportes — Patrón Bridge",
+    description="Exporta reportes de tareas, auditoría o equipo en formatos PDF, CSV o JSON usando el patrón Bridge.",
+)
+async def exportar_reporte(
+    proyecto_id: str,
+    tipo: str = Query("tareas", pattern="^(tareas|auditoria|equipo)$"),
+    formato: str = Query("json", pattern="^(pdf|csv|json)$"),
+    usuario: dict = Depends(obtener_usuario_actual),
+):
+    reportes = {
+        "tareas": ReporteTareas,
+        "auditoria": ReporteAuditoria,
+        "equipo": ReporteEquipo,
+    }
+    exportadores = {
+        "pdf": ExportadorPDF,
+        "csv": ExportadorCSV,
+        "json": ExportadorJSON,
+    }
+
+    try:
+        reporte = reportes[tipo](exportadores[formato]())
+        contenido, mime, nombre_archivo = await reporte.exportar(proyecto_id, usuario)
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Tipo de reporte o formato no soportado")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    return Response(
+        content=contenido,
+        media_type=mime,
+        headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
+    )
