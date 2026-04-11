@@ -1,19 +1,9 @@
 """
 APIs externas para notificaciones.
   - Email REAL via Gmail SMTP (nativo de Python, sin dependencias extra)
-  - WhatsApp y SMS: simulados con logs en consola
-
-CONFIGURACION (solo 2 lineas en .env):
-    EMAIL_SMTP_USER=tu_email@gmail.com
-    EMAIL_SMTP_PASSWORD=xxxx xxxx xxxx xxxx   # App Password de Google
-
-Para obtener el App Password:
-  1. Ir a https://myaccount.google.com/security
-  2. Activar verificacion en 2 pasos
-  3. Ir a "Contrasenas de aplicacion"
-  4. Generar para Correo
+  - WhatsApp y SMS REALES via Twilio (si esta configurado)
+  - Si faltan credenciales de Twilio, devuelve error explícito
 """
-import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -24,6 +14,18 @@ try:
 except Exception:
     configuracion = None
     _CONFIGURACION_DISPONIBLE = False
+
+
+def _twilio_config():
+    if not (_CONFIGURACION_DISPONIBLE and configuracion):
+        return None, None, None, None
+
+    return (
+        (getattr(configuracion, "twilio_account_sid", None) or "").strip(),
+        (getattr(configuracion, "twilio_auth_token", None) or "").strip(),
+        (getattr(configuracion, "twilio_sms_from", None) or "").strip(),
+        (getattr(configuracion, "twilio_whatsapp_from", None) or "").strip(),
+    )
 
 
 class EmailRequest:
@@ -57,10 +59,8 @@ class EmailAPI:
             smtp_password = getattr(configuracion, "email_smtp_password", None)
 
         if not smtp_user or not smtp_password:
-            msg_id = f"EMAIL-SIM-{uuid.uuid4().hex[:10]}"
-            print(f"[Email Simulado] {msg_id} -> {request.to} | Asunto: {request.subject}")
-            print("  Agrega EMAIL_SMTP_USER y EMAIL_SMTP_PASSWORD al .env para envio real")
-            return EmailResponse(delivered="Y", message_id=msg_id)
+            print("[Email] Falta configuración SMTP: EMAIL_SMTP_USER y EMAIL_SMTP_PASSWORD")
+            return EmailResponse(delivered="N", message_id="")
 
         try:
             msg = MIMEMultipart("alternative")
@@ -90,8 +90,8 @@ class EmailAPI:
                 server.login(smtp_user, smtp_password)
                 server.send_message(msg)
 
-            msg_id = f"GMAIL-{uuid.uuid4().hex[:12]}"
-            print(f"[Email REAL enviado] {msg_id} -> {request.to}")
+            msg_id = msg.get("Message-ID", "")
+            print(f"[Email REAL enviado] -> {request.to}")
             return EmailResponse(delivered="Y", message_id=msg_id)
 
         except smtplib.SMTPAuthenticationError:
@@ -103,25 +103,58 @@ class EmailAPI:
 
 
 class WhatsAppRequest:
-    def __init__(self, phone: str, body: str):
+    def __init__(self, phone: str, body: str = "", content_sid: str = "", content_variables: str = ""):
         self.phone = phone
         self.body = body
+        self.content_sid = content_sid
+        self.content_variables = content_variables
 
 
 class WhatsAppResponse:
-    def __init__(self, status: str, message_id: str):
+    def __init__(self, status: str, message_id: str, error_code: str = "", error_message: str = ""):
         self.status = status
         self.message_id = message_id
+        self.error_code = error_code
+        self.error_message = error_message
 
 
 class WhatsAppAPI:
     @staticmethod
     def send_message(request: WhatsAppRequest) -> WhatsAppResponse:
-        if not request.phone or not request.body:
+        if not request.phone:
             return WhatsAppResponse(status="failed", message_id="")
-        msg_id = f"WA-SIM-{uuid.uuid4().hex[:8].upper()}"
-        print(f"[WhatsApp Simulado] {msg_id} -> {request.phone} | {request.body[:80]}...")
-        return WhatsAppResponse(status="sent", message_id=msg_id)
+        if not request.body and not request.content_sid:
+            return WhatsAppResponse(status="failed", message_id="")
+
+        account_sid, auth_token, _sms_from, wa_from = _twilio_config()
+
+        if account_sid and auth_token and wa_from:
+            try:
+                from twilio.rest import Client
+
+                client = Client(account_sid, auth_token)
+                from_number = wa_from if wa_from.startswith("whatsapp:") else f"whatsapp:{wa_from}"
+                to_number = request.phone if request.phone.startswith("whatsapp:") else f"whatsapp:{request.phone}"
+                payload = {"from_": from_number, "to": to_number}
+                if request.content_sid:
+                    payload["content_sid"] = request.content_sid
+                    if request.content_variables:
+                        payload["content_variables"] = request.content_variables
+                else:
+                    payload["body"] = request.body
+                mensaje = client.messages.create(**payload)
+                return WhatsAppResponse(
+                    status=(mensaje.status or ""),
+                    message_id=mensaje.sid or "",
+                    error_code=str(mensaje.error_code or ""),
+                    error_message=str(mensaje.error_message or ""),
+                )
+            except Exception as e:
+                print(f"[WhatsApp Twilio] Error: {str(e)}")
+                return WhatsAppResponse(status="failed", message_id="", error_message=str(e))
+
+        print("  Falta configuración Twilio: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y TWILIO_WHATSAPP_FROM")
+        return WhatsAppResponse(status="failed", message_id="")
 
 
 class SmsRequest:
@@ -131,10 +164,21 @@ class SmsRequest:
 
 
 class SmsResponse:
-    def __init__(self, code: int, description: str, message_id: str = ""):
+    def __init__(
+        self,
+        code: int,
+        description: str,
+        message_id: str = "",
+        status: str = "",
+        error_code: str = "",
+        error_message: str = "",
+    ):
         self.code = code
         self.description = description
         self.message_id = message_id
+        self.status = status
+        self.error_code = error_code
+        self.error_message = error_message
 
 
 class SmsAPI:
@@ -142,6 +186,37 @@ class SmsAPI:
     def send_sms(request: SmsRequest) -> SmsResponse:
         if not request.number or not request.text:
             return SmsResponse(code=400, description="Invalid")
-        msg_id = f"SMS-SIM-{uuid.uuid4().hex[:8].upper()}"
-        print(f"[SMS Simulado] {msg_id} -> {request.number} | {request.text[:80]}...")
-        return SmsResponse(code=200, description="Simulated OK", message_id=msg_id)
+
+        account_sid, auth_token, sms_from, _wa_from = _twilio_config()
+
+        if account_sid and auth_token and sms_from:
+            try:
+                from twilio.rest import Client
+
+                client = Client(account_sid, auth_token)
+                mensaje = client.messages.create(
+                    body=request.text,
+                    from_=sms_from,
+                    to=request.number,
+                )
+                estado = (mensaje.status or "").lower()
+                aceptado = estado in {"accepted", "queued", "sending", "sent", "delivered"}
+                return SmsResponse(
+                    code=200 if aceptado else 500,
+                    description=f"Twilio status: {mensaje.status}",
+                    message_id=mensaje.sid or "",
+                    status=mensaje.status or "",
+                    error_code=str(mensaje.error_code or ""),
+                    error_message=str(mensaje.error_message or ""),
+                )
+            except Exception as e:
+                print(f"[SMS Twilio] Error: {str(e)}")
+                return SmsResponse(
+                    code=500,
+                    description=f"Twilio error: {str(e)}",
+                    status="failed",
+                    error_message=str(e),
+                )
+
+        print("  Falta configuración Twilio: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y TWILIO_SMS_FROM")
+        return SmsResponse(code=500, description="Twilio no configurado", message_id="")

@@ -440,19 +440,6 @@ const PAGINAS_HTML = {
         <div class="stat" style="--g:rgba(52,211,153,.3)"><div class="stat-n">Progreso</div><div class="stat-v" id="rProg">—</div></div>
       </div>
       <div class="card"><div class="card-t"><i class="ph ph-list-bullets"></i> Distribución por columna</div><div id="rDist" class="vacío">Selecciona un proyecto</div></div>
-      <div class="card" style="margin-top:12px">
-        <div class="card-t"><i class="ph ph-export"></i> Exportar reportes (Bridge)</div>
-        <div class="flex" style="gap:8px;flex-wrap:wrap;margin-bottom:8px">
-          <button class="btn btn-outline btn-sm" onclick="exportarReporteBridge('tareas','pdf')"><i class="ph ph-file-pdf"></i> Tareas PDF</button>
-          <button class="btn btn-outline btn-sm" onclick="exportarReporteBridge('tareas','csv')"><i class="ph ph-file-csv"></i> Tareas CSV</button>
-          <button class="btn btn-outline btn-sm" onclick="exportarReporteBridge('tareas','json')"><i class="ph ph-file-code"></i> Tareas JSON</button>
-        </div>
-        <div class="flex" style="gap:8px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="exportarReporteBridge('auditoria','pdf')"><i class="ph ph-shield-check"></i> Auditoría PDF</button>
-          <button class="btn btn-outline btn-sm" onclick="exportarReporteBridge('auditoria','csv')"><i class="ph ph-shield-check"></i> Auditoría CSV</button>
-          <button class="btn btn-outline btn-sm" onclick="exportarReporteBridge('equipo','json')"><i class="ph ph-users-three"></i> Equipo JSON</button>
-        </div>
-      </div>
     </div>
     <div class="hpanel" id="rpanel-sprint">
       <div class="card">

@@ -26,13 +26,21 @@ async function cargarProyectos() {
       .map(
         (p) => `
       <div class="prow">
-        <div>
-          <div class="prow-name">${p.nombre}</div>
-          <div class="prow-desc">${p.descripcion || "Sin descripción"} · Fin: ${fFecha(p.fechaFinEstimada)}</div>
-          <div class="prow-prog"><div class="prog"><div class="prog-bar" style="width:${p.progreso}%"></div></div></div>
+        <div class="prow-main">
+          <div class="prow-top">
+            <div class="prow-name">${p.nombre}</div>
+            ${badgeEstado(p.estado)}
+          </div>
+          <div class="prow-desc">${p.descripcion || "Sin descripción"}</div>
+          <div class="prow-meta">
+            <span><i class="ph ph-calendar-blank"></i> Fin: ${fFecha(p.fechaFinEstimada)}</span>
+            <span><i class="ph ph-gauge"></i> Progreso: ${Number(p.progreso || 0).toFixed(1)}%</span>
+          </div>
+          <div class="prow-prog">
+            <div class="prog"><div class="prog-bar" style="width:${p.progreso}%"></div></div>
+          </div>
         </div>
-        ${badgeEstado(p.estado)}
-        <div class="flex" style="gap:5px">
+        <div class="prow-actions">
           <button class="btn btn-outline btn-xs" onclick="irTablero('${p.id}','${p.nombre}')"><i class='ph ph-kanban'></i> Tablero</button>
           ${
             S.usuario.rol !== "DEVELOPER"
@@ -1399,98 +1407,6 @@ function seleccionarCanalNotif(el) {
   set("flujoApi", info.api || "");
 }
 
-async function _cargarUsuariosParaNotif() {
-  const sel = document.getElementById("notifDestinatario");
-  if (!sel || sel.options.length > 1) return;
-  try {
-    const us = await api("GET", "/usuarios/");
-    sel.innerHTML =
-      '<option value="">Selecciona usuario</option>' +
-      us
-        .map(
-          (u) =>
-            '<option value="' +
-            u.id +
-            '">' +
-            u.nombre +
-            " (" +
-            u.email +
-            ")</option>",
-        )
-        .join("");
-  } catch (_) {}
-}
-
-async function enviarNotificacionExterna() {
-  const canalEl = document.querySelector(".notif-canal.activo");
-  const canal = canalEl ? canalEl.dataset.canal : "email";
-  const userId = document.getElementById("notifDestinatario")
-    ? document.getElementById("notifDestinatario").value
-    : "";
-  const msgEl = document.getElementById("notifMensaje");
-  const mensaje = msgEl ? msgEl.value.trim() : "";
-  const asuntoEl = document.getElementById("notifAsunto");
-  const asunto = asuntoEl ? asuntoEl.value.trim() : "Notificacion TaskFlow";
-  const resEl = document.getElementById("notifEnvioResultado");
-
-  if (!userId) {
-    toast("Selecciona un destinatario", "err");
-    return;
-  }
-  if (!mensaje) {
-    toast("Escribe un mensaje", "err");
-    return;
-  }
-
-  if (resEl) resEl.innerHTML = '<span class="spinner"></span> Enviando...';
-
-  try {
-    // Obtener telefono si es WhatsApp o SMS
-    const telEl = document.getElementById("nTelefono");
-    const telefono =
-      (canal === "whatsapp" || canal === "sms") && telEl
-        ? telEl.value.trim()
-        : null;
-
-    const body = {
-      canal,
-      usuarioId: userId,
-      mensaje,
-      asunto: asunto || "Notificacion TaskFlow",
-    };
-    if (telefono) body.contacto = telefono;
-
-    const r = await api("POST", "/notificaciones/enviar-externo", body);
-    if (resEl) {
-      if (resp.enviada) {
-        resEl.innerHTML =
-          '<span style="color:var(--green)">Enviado por ' +
-          resp.canal +
-          " - " +
-          resp.detalle +
-          "</span>";
-      } else {
-        resEl.innerHTML =
-          '<span style="color:var(--red)">No enviado - ' +
-          resp.detalle +
-          "</span>";
-      }
-    }
-    toast(
-      resp.enviada
-        ? "Notificacion enviada por " + resp.canal
-        : "No se pudo enviar: " + resp.detalle,
-      resp.enviada ? "ok" : "err",
-    );
-    if (msgEl) msgEl.value = "";
-  } catch (e) {
-    if (resEl)
-      resEl.innerHTML =
-        '<span style="color:var(--red)">Error: ' + e.message + "</span>";
-    toast(e.message, "err");
-  }
-}
-
 /* ══════════════════════════════════════════════════
    NOTIFICACIONES EXTERNAS — Panel inline
    Factory Method + Adapter
@@ -1581,9 +1497,20 @@ async function notifEnviar() {
   const asuntoEl = document.getElementById("nAsunto");
   const asunto = asuntoEl ? asuntoEl.value.trim() : "Notificacion TaskFlow";
 
-  // Leer teléfono (WhatsApp / SMS) — CORRECCIÓN: leer siempre el valor actual
+  // Leer teléfono (WhatsApp / SMS)
   const telEl = document.getElementById("nTelefono");
-  const telefono = telEl ? telEl.value.trim() : "";
+  const telefonoRaw = telEl ? telEl.value.trim() : "";
+  const codPais = document.getElementById("nCodPais")?.value || "+57";
+
+  function normalizarTelefono(raw, codigo) {
+    const limpio = (raw || "").replace(/[^\d+]/g, "");
+    if (!limpio) return "";
+    if (limpio.startsWith("+")) return "+" + limpio.slice(1).replace(/\D/g, "");
+    const soloDigitos = limpio.replace(/\D/g, "");
+    const prefijo = (codigo || "+57").replace(/[^\d+]/g, "");
+    return `${prefijo}${soloDigitos}`;
+  }
+  const telefono = normalizarTelefono(telefonoRaw, codPais);
 
   const resEl = document.getElementById("nResultado");
   const errEl = document.getElementById("nError");
@@ -1631,26 +1558,39 @@ async function notifEnviar() {
     const r = await api("POST", "/notificaciones/enviar-externo", cuerpo);
 
     const ok = r.enviada;
+    const estado = (r.estado || "").toLowerCase();
+    const entregado = estado === "delivered";
+    const aceptado = ["accepted", "queued", "sending", "sent", "delivered"].includes(estado);
+    const etiqueta = entregado ? "Entregado" : aceptado ? "Aceptado por Twilio" : "No enviado";
     const ico = ok
       ? '<i class="ph ph-check-circle" style="color:var(--green)"></i>'
       : '<i class="ph ph-x-circle" style="color:var(--red)"></i>';
 
     if (resEl) {
+      const estadoTxt = r.estado ? ` · estado: ${r.estado}` : "";
+      const sidTxt = r.sid ? ` · SID: ${r.sid}` : "";
+      const errTxt = r.codigo_error || r.mensaje_error
+        ? ` · error_code: ${r.codigo_error || "-"} · ${r.mensaje_error || ""}`
+        : "";
       resEl.innerHTML =
-        `${ico} <strong>${ok ? "Enviado" : "No enviado"}</strong> por ${r.canal || canal}` +
-        ` · ${r.detalle || ""}` +
-        (r.contacto_usado ? ` → ${r.contacto_usado}` : "");
+        `${ico} <strong>${etiqueta}</strong> por ${r.canal || canal}` +
+        `${estadoTxt}${sidTxt}` +
+        (r.contacto_usado ? ` → ${r.contacto_usado}` : "") +
+        ` · ${r.detalle || ""}${errTxt}`;
     }
 
     toast(
-      ok
-        ? `Notificación enviada por ${canal}`
+      aceptado
+        ? `Notificación aceptada por ${canal}`
         : `No se pudo enviar: ${r.detalle || "error"}`,
-      ok ? "ok" : "err",
+      aceptado ? "ok" : "err",
     );
 
     // Limpiar mensaje si se envió correctamente
     if (msgEl && ok) msgEl.value = "";
+    if (telEl && ok && (canal === "whatsapp" || canal === "sms")) {
+      telEl.value = telefono;
+    }
   } catch (e) {
     if (errEl) errEl.textContent = e.message;
     if (resEl)
@@ -1661,69 +1601,6 @@ async function notifEnviar() {
       btn.disabled = false;
       btn.innerHTML =
         '<i class="ph ph-paper-plane-tilt"></i> Enviar notificación';
-    }
-  }
-}
-
-async function notifProbarTodos() {
-  const userId = document.getElementById("nDestinatario")?.value || "";
-  const errEl = document.getElementById("nError");
-  const resEl = document.getElementById("nResultado");
-  const btn = document.getElementById("btnProbarCanales");
-
-  if (!userId) {
-    if (errEl) errEl.textContent = "Selecciona un destinatario";
-    return;
-  }
-
-  // Leer teléfono del campo visible
-  const telEl = document.getElementById("nTelefono");
-  const telVal = telEl ? telEl.value.trim() : "";
-
-  if (errEl) errEl.textContent = "";
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Probando...';
-  }
-  if (resEl)
-    resEl.innerHTML = '<span class="spinner"></span> Probando los 3 canales...';
-
-  try {
-    const bodyProbar = { usuarioId: userId };
-    // CORRECCIÓN: enviar el teléfono para ambos canales si está disponible
-    if (telVal) {
-      bodyProbar.contactoWhatsapp = telVal;
-      bodyProbar.contactoSms = telVal;
-    }
-
-    const r = await api("POST", "/notificaciones/probar-canales", bodyProbar);
-    const resultados = Object.entries(r.resultados || {});
-
-    if (resEl) {
-      resEl.innerHTML = resultados
-        .map(([canal, res]) => {
-          const ok = res.enviada;
-          return (
-            `<span style="margin-right:12px">` +
-            (ok
-              ? '<i class="ph ph-check-circle" style="color:var(--green)"></i>'
-              : '<i class="ph ph-x-circle" style="color:var(--red)"></i>') +
-            ` <strong>${canal.toUpperCase()}</strong>: ${res.detalle || ""}` +
-            (res.contacto_usado ? ` → ${res.contacto_usado}` : "") +
-            `</span>`
-          );
-        })
-        .join("<br>");
-    }
-
-    toast("Prueba de 3 canales completada");
-  } catch (e) {
-    if (errEl) errEl.textContent = e.message;
-    toast(e.message, "err");
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="ph ph-broadcast"></i> Probar todos';
     }
   }
 }

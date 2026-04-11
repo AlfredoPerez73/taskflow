@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, Body
+from fastapi.responses import StreamingResponse
+import asyncio
+import json
 from typing import List
 from app.schemas.notificaciones import ActualizarPreferencias, RespuestaNotificacion, RespuestaPreferencias
 from app.services import servicio_notificacion
-from app.core.dependencias import obtener_usuario_actual, requerir_rol
+from app.core.dependencias import obtener_usuario_actual, requerir_rol, obtener_usuario_desde_query
+from app.core.gestor_eventos import gestor_eventos, evento_ping
 
 enrutador = APIRouter(prefix="/notificaciones", tags=["Notificaciones"])
 
@@ -67,6 +71,8 @@ async def enviar_notificacion_externa(
     asunto   = body.get("asunto", "Notificación TaskFlow")
 
     contacto = body.get("contacto", None)  # numero telefono para WhatsApp/SMS
+    content_sid = body.get("contentSid", None)
+    content_variables = body.get("contentVariables", None)
 
     resultado = await servicio_notificacion.enviar_notificacion_externa(
         usuario_id=user_id,
@@ -74,6 +80,8 @@ async def enviar_notificacion_externa(
         canal=canal,
         asunto=asunto,
         contacto_directo=contacto,
+        content_sid=content_sid,
+        content_variables=content_variables,
     )
     return resultado
 
@@ -97,4 +105,37 @@ async def probar_todos_canales(
         mensaje=mensaje,
         contacto_whatsapp=contacto_wa,
         contacto_sms=contacto_sms,
+    )
+
+
+@enrutador.get(
+    "/stream",
+    summary="Stream SSE de notificaciones",
+    description="Canal en tiempo real para recibir notificaciones usando Server-Sent Events.",
+)
+async def stream_notificaciones(usuario: dict = Depends(obtener_usuario_desde_query)):
+    usuario_id = usuario["_id"]
+    cola = gestor_eventos.suscribir_usuario(usuario_id)
+
+    async def _generador():
+        try:
+            saludo = {"tipo": "conectado", "usuarioId": usuario_id}
+            yield f"data: {json.dumps(saludo, ensure_ascii=False)}\n\n"
+            while True:
+                try:
+                    evento = await asyncio.wait_for(cola.get(), timeout=20.0)
+                except TimeoutError:
+                    evento = evento_ping()
+                yield f"data: {json.dumps(evento, ensure_ascii=False, default=str)}\n\n"
+        finally:
+            gestor_eventos.desuscribir_usuario(usuario_id, cola)
+
+    return StreamingResponse(
+        _generador(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

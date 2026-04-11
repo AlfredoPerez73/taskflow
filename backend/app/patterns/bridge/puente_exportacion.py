@@ -212,22 +212,7 @@ class ExportadorCSV(ExportadorImplementacion):
 
 class ExportadorPDF(ExportadorImplementacion):
     def exportar(self, reporte: dict[str, Any]) -> bytes:
-        lineas: list[str] = []
-        lineas.append(reporte.get("titulo", "Reporte"))
-        lineas.append(f"Proyecto: {reporte.get('proyectoNombre', '')}")
-        lineas.append(f"Generado: {reporte.get('generadoEn', '')}")
-        lineas.append("")
-        lineas.append("Resumen:")
-        for k, v in (reporte.get("resumen") or {}).items():
-            lineas.append(f"- {k}: {v}")
-        lineas.append("")
-        lineas.append("Detalle:")
-        for idx, fila in enumerate(reporte.get("filas", []), start=1):
-            pares = " | ".join(f"{k}={fila.get(k, '')}" for k in fila.keys())
-            lineas.append(f"{idx}. {pares}")
-
-        contenido_texto = "\n".join(lineas)
-        return _crear_pdf_simple(contenido_texto)
+        return _crear_pdf_reporte_estilizado(reporte)
 
     def extension(self) -> str:
         return ".pdf"
@@ -244,20 +229,180 @@ def _formatear_fecha(valor: Any) -> str:
     return str(valor)
 
 
-def _crear_pdf_simple(texto: str) -> bytes:
+def _crear_pdf_reporte_estilizado(reporte: dict[str, Any]) -> bytes:
     """
-    Genera un PDF básico sin dependencias externas.
+    Genera un PDF con encabezado visual y secciones legibles sin librerías externas.
     """
     def _escape_pdf(s: str) -> str:
         return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
-    lineas = texto.splitlines() or [""]
-    comandos: list[str] = ["BT", "/F1 10 Tf", "50 790 Td", "14 TL"]
-    for i, linea in enumerate(lineas):
-        if i > 0:
-            comandos.append("T*")
-        comandos.append(f"({_escape_pdf(linea)}) Tj")
+    def _items_detalle() -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for idx, fila in enumerate(reporte.get("filas", []), start=1):
+            if idx > 28:
+                break
+            items.append(
+                {
+                    "numero": idx,
+                    "id": fila.get("id") or "-",
+                    "titulo": fila.get("titulo") or "-",
+                    "tipo": fila.get("tipo") or "-",
+                    "prioridad": fila.get("prioridad") or "-",
+                    "columnaId": fila.get("columnaId") or "-",
+                    "responsables": fila.get("responsables") or "-",
+                    "vencimiento": fila.get("vencimiento") or "-",
+                }
+            )
+        return items
+
+    titulo = str(reporte.get("titulo", "Reporte"))
+    proyecto = str(reporte.get("proyectoNombre", ""))
+    generado = str(reporte.get("generadoEn", ""))
+    resumen = reporte.get("resumen") or {}
+    resumen_lineas = [f"- {k}: {v}" for k, v in resumen.items()] or ["- Sin metricas disponibles"]
+    detalle_items = _items_detalle()
+
+    comandos: list[str] = []
+    # Fondo encabezado
+    comandos.extend(
+        [
+            "q",
+            "0.12 0.10 0.30 rg",
+            "0 770 595 72 re f",
+            "Q",
+        ]
+    )
+    # Línea decorativa
+    comandos.extend(
+        [
+            "q",
+            "0.42 0.38 0.96 RG",
+            "2 w",
+            "40 765 m",
+            "555 765 l",
+            "S",
+            "Q",
+        ]
+    )
+
+    y = 812
+    comandos.append("BT")
+    comandos.append("/F2 18 Tf")
+    comandos.append("1 1 1 rg")
+    comandos.append(f"40 {y} Td")
+    comandos.append(f"({_escape_pdf(titulo[:72])}) Tj")
     comandos.append("ET")
+
+    meta = f"Proyecto: {proyecto}   |   Generado: {generado}"
+    comandos.append("BT")
+    comandos.append("/F1 9 Tf")
+    comandos.append("0.88 0.88 1 rg")
+    comandos.append("40 792 Td")
+    comandos.append(f"({_escape_pdf(meta[:120])}) Tj")
+    comandos.append("ET")
+
+    # Resumen
+    y = 742
+    comandos.append("BT")
+    comandos.append("/F2 12 Tf")
+    comandos.append("0.16 0.18 0.35 rg")
+    comandos.append(f"40 {y} Td")
+    comandos.append("(Resumen ejecutivo) Tj")
+    comandos.append("ET")
+    y -= 18
+
+    for linea in resumen_lineas:
+        if y < 80:
+            break
+        for sub in _envolver_texto(linea, 95):
+            if y < 80:
+                break
+            comandos.append("BT")
+            comandos.append("/F1 10 Tf")
+            comandos.append("0.12 0.12 0.12 rg")
+            comandos.append(f"48 {y} Td")
+            comandos.append(f"({_escape_pdf(sub)}) Tj")
+            comandos.append("ET")
+            y -= 13
+
+    y -= 10
+    if y > 90:
+        comandos.append("BT")
+        comandos.append("/F2 12 Tf")
+        comandos.append("0.16 0.18 0.35 rg")
+        comandos.append(f"40 {y} Td")
+        comandos.append("(Detalle) Tj")
+        comandos.append("ET")
+        y -= 16
+
+    if not detalle_items:
+        comandos.append("BT")
+        comandos.append("/F1 9 Tf")
+        comandos.append("0.25 0.25 0.25 rg")
+        comandos.append(f"48 {y} Td")
+        comandos.append("(Sin registros para mostrar.) Tj")
+        comandos.append("ET")
+    else:
+        for item in detalle_items:
+            if y < 120:
+                break
+            # tarjeta del ítem
+            alto = 90
+            top = y + 8
+            bottom = top - alto
+            comandos.extend(
+                [
+                    "q",
+                    "0.97 0.97 1 rg",
+                    f"40 {bottom} 515 {alto} re f",
+                    "0.86 0.86 0.95 RG",
+                    "0.7 w",
+                    f"40 {bottom} 515 {alto} re S",
+                    "Q",
+                ]
+            )
+            # título del bloque
+            comandos.append("BT")
+            comandos.append("/F2 10 Tf")
+            comandos.append("0.16 0.18 0.35 rg")
+            comandos.append(f"48 {top - 16} Td")
+            comandos.append(f"(Item {item['numero']} - { _escape_pdf(str(item['titulo'])[:58]) }) Tj")
+            comandos.append("ET")
+
+            linea1 = f"ID: {item['id']}    Tipo: {item['tipo']}    Prioridad: {item['prioridad']}"
+            linea2 = f"Columna: {item['columnaId']}"
+            linea3 = f"Responsables: {item['responsables']}"
+            linea4 = f"Vencimiento: {item['vencimiento']}"
+
+            yy = top - 32
+            for linea in [linea1, linea2, linea3, linea4]:
+                for sub in _envolver_texto(str(linea), 96):
+                    comandos.append("BT")
+                    comandos.append("/F1 8.8 Tf")
+                    comandos.append("0.16 0.16 0.16 rg")
+                    comandos.append(f"50 {yy} Td")
+                    comandos.append(f"({_escape_pdf(sub)}) Tj")
+                    comandos.append("ET")
+                    yy -= 10
+
+            y = bottom - 10
+
+        if len(reporte.get("filas", [])) > len(detalle_items) and y > 40:
+            comandos.append("BT")
+            comandos.append("/F1 8 Tf")
+            comandos.append("0.45 0.45 0.55 rg")
+            comandos.append(f"40 {max(y, 36)} Td")
+            comandos.append("(Detalle truncado para mantener una presentacion limpia del reporte.) Tj")
+            comandos.append("ET")
+
+    # Pie de página
+    comandos.append("BT")
+    comandos.append("/F1 8 Tf")
+    comandos.append("0.45 0.45 0.55 rg")
+    comandos.append("40 24 Td")
+    comandos.append("(TaskFlow - Reporte generado automaticamente) Tj")
+    comandos.append("ET")
+
     stream = "\n".join(comandos).encode("latin-1", errors="replace")
 
     objects: list[bytes] = []
@@ -265,11 +410,12 @@ def _crear_pdf_simple(texto: str) -> bytes:
     objects.append(b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
     objects.append(
         b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
-        b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n"
+        b"/Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n"
     )
     objects.append(b"4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n")
+    objects.append(b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n")
     objects.append(
-        f"5 0 obj\n<< /Length {len(stream)} >>\nstream\n".encode("ascii")
+        f"6 0 obj\n<< /Length {len(stream)} >>\nstream\n".encode("ascii")
         + stream
         + b"\nendstream\nendobj\n"
     )
@@ -296,4 +442,23 @@ def _crear_pdf_simple(texto: str) -> bytes:
         ).encode("ascii")
     )
     return output.getvalue()
+
+
+def _envolver_texto(texto: str, ancho: int) -> list[str]:
+    if len(texto) <= ancho:
+        return [texto]
+    palabras = texto.split(" ")
+    lineas: list[str] = []
+    actual = ""
+    for palabra in palabras:
+        candidato = palabra if not actual else f"{actual} {palabra}"
+        if len(candidato) <= ancho:
+            actual = candidato
+            continue
+        if actual:
+            lineas.append(actual)
+        actual = palabra
+    if actual:
+        lineas.append(actual)
+    return lineas
 

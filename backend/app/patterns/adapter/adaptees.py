@@ -34,16 +34,32 @@ class WhatsAppAdaptee(INotificacionAdapter):
         wa_request = WhatsAppRequest(
             phone=solicitud.contacto,
             body=f"🔔 TaskFlow\n{solicitud.mensaje}",
+            content_sid=solicitud.content_sid,
+            content_variables=solicitud.content_variables,
         )
 
         # Llamar a la API externa
         wa_response = WhatsAppAPI.send_message(wa_request)
 
         # Traducir respuesta de WhatsApp al formato estándar
+        estado = (wa_response.status or "").lower()
+        aceptado = estado in {"accepted", "queued", "sending", "sent", "delivered"}
+        detalle = (
+            f"Twilio status: {wa_response.status} | SID: {wa_response.message_id}"
+            if wa_response.message_id
+            else "Falló el envío"
+        )
+        if wa_response.error_code or wa_response.error_message:
+            detalle += f" | error_code: {wa_response.error_code or '-'} | error: {wa_response.error_message or '-'}"
+
         return RespuestaNotificacion(
-            enviada=wa_response.status == "sent",
+            enviada=aceptado,
             canal="whatsapp",
-            detalle=f"ID: {wa_response.message_id}" if wa_response.message_id else "Falló el envío",
+            detalle=detalle,
+            estado=wa_response.status or "",
+            sid=wa_response.message_id or "",
+            codigo_error=wa_response.error_code or "",
+            mensaje_error=wa_response.error_message or "",
         )
 
 
@@ -91,8 +107,17 @@ class SmsAdaptee(INotificacionAdapter):
         sms_response = SmsAPI.send_sms(sms_request)
 
         # Traducir respuesta de SMS al formato estándar
+        detalle = sms_response.description
+        if sms_response.message_id:
+            detalle = f"{detalle} | SID: {sms_response.message_id}"
+        if sms_response.error_code or sms_response.error_message:
+            detalle += f" | error_code: {sms_response.error_code or '-'} | error: {sms_response.error_message or '-'}"
         return RespuestaNotificacion(
             enviada=sms_response.code == 200,
             canal="sms",
-            detalle=sms_response.description,
+            detalle=detalle,
+            estado=sms_response.status or "",
+            sid=sms_response.message_id or "",
+            codigo_error=sms_response.error_code or "",
+            mensaje_error=sms_response.error_message or "",
         )

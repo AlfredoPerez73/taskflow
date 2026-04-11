@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 from fastapi import HTTPException
 import uuid
+import json
 
 from app.db.conexion import ConexionMongoDB
 from app.schemas.notificaciones import ActualizarPreferencias
 from app.patterns.adapter.notificacion_adapter import SolicitudNotificacion
 from app.patterns.adapter.proveedor_notificacion import ProveedorNotificacion
+from app.core.configuracion import configuracion
 
 _proveedor_notificacion = ProveedorNotificacion()
 
@@ -133,6 +135,8 @@ async def enviar_notificacion_externa(
     canal: str = "email",
     asunto: str = "Notificacion TaskFlow",
     contacto_directo: str | None = None,
+    content_sid: str | None = None,
+    content_variables: str | None = None,
 ) -> dict:
     """
     Envía notificación por canal externo usando Factory Method + Adapter.
@@ -179,6 +183,27 @@ async def enviar_notificacion_externa(
 
     # ── Ejecutar Factory Method + Adapter ────────────────────────────────
     try:
+        # WhatsApp: forzar template si no viene en el request para evitar error 3016
+        content_sid_final = (content_sid or "").strip()
+        content_variables_final = (content_variables or "").strip()
+        if canal == "whatsapp" and not content_sid_final:
+            content_sid_final = (getattr(configuracion, "twilio_whatsapp_content_sid", None) or "").strip()
+            content_variables_final = (
+                getattr(configuracion, "twilio_whatsapp_content_variables", None) or ""
+            ).strip()
+        if canal == "whatsapp" and content_sid_final:
+            clave_mensaje = (getattr(configuracion, "twilio_whatsapp_mensaje_key", None) or "1").strip()
+            vars_dict = {}
+            if content_variables_final:
+                try:
+                    parsed = json.loads(content_variables_final)
+                    if isinstance(parsed, dict):
+                        vars_dict = {str(k): str(v) for k, v in parsed.items()}
+                except Exception:
+                    vars_dict = {}
+            vars_dict[clave_mensaje] = (mensaje or "").strip() or "Notificación TaskFlow"
+            content_variables_final = json.dumps(vars_dict, ensure_ascii=False)
+
         fabrica = _proveedor_notificacion.get(canal)
         adapter = fabrica.get()
         solicitud = SolicitudNotificacion(
@@ -186,6 +211,8 @@ async def enviar_notificacion_externa(
             contacto=contacto,
             mensaje=mensaje,
             asunto=asunto,
+            content_sid=content_sid_final,
+            content_variables=content_variables_final,
         )
         respuesta = adapter.enviar(solicitud)
 
@@ -201,6 +228,10 @@ async def enviar_notificacion_externa(
             "canal":          respuesta.canal,
             "detalle":        respuesta.detalle,
             "contacto_usado": contacto,
+            "estado":         respuesta.estado,
+            "sid":            respuesta.sid,
+            "codigo_error":   respuesta.codigo_error,
+            "mensaje_error":  respuesta.mensaje_error,
         }
     except ValueError as e:
         return {"enviada": False, "canal": canal, "detalle": str(e)}

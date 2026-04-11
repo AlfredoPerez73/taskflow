@@ -22,6 +22,8 @@ class SolicitudNotificacion:
     contacto: str          # email / teléfono / número WA según canal
     mensaje: str           # cuerpo del mensaje
     asunto: str = ""       # usado por email
+    content_sid: str = ""  # usado por WhatsApp template
+    content_variables: str = ""  # JSON string para WhatsApp template
 
 
 @dataclass
@@ -30,6 +32,10 @@ class RespuestaNotificacion:
     enviada: bool
     canal: str
     detalle: str = ""
+    estado: str = ""
+    sid: str = ""
+    codigo_error: str = ""
+    mensaje_error: str = ""
 
 
 class INotificacionAdapter(ABC):

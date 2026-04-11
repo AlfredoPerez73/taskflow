@@ -153,26 +153,38 @@
         <!-- Campo de teléfono — visible solo para WhatsApp/SMS -->
         <div class="fg" id="nTelWrap" style="display: none; margin-top: 10px">
           <label class="flabel" id="nTelLabel">Número de WhatsApp</label>
-          <div style="position: relative">
-            <i
-              class="ph ph-phone"
-              style="
-                position: absolute;
-                left: 11px;
-                top: 50%;
-                transform: translateY(-50%);
-                color: var(--t3);
-                font-size: 15px;
-                pointer-events: none;
-              "
-            ></i>
-            <input
-              class="finput"
-              id="nTelefono"
-              placeholder="+57 300 000 0000"
-              style="padding-left: 36px"
-              title="Incluye el código de país. Ej: +57 para Colombia"
-            />
+          <div class="nphone-row">
+            <select class="fselect" id="nCodPais" title="Código de país">
+              <option value="+57" selected>🇨🇴 +57</option>
+              <option value="+34">🇪🇸 +34</option>
+              <option value="+52">🇲🇽 +52</option>
+              <option value="+54">🇦🇷 +54</option>
+              <option value="+51">🇵🇪 +51</option>
+              <option value="+56">🇨🇱 +56</option>
+              <option value="+58">🇻🇪 +58</option>
+              <option value="+1">🇺🇸 +1</option>
+            </select>
+            <div style="position: relative; flex: 1">
+              <i
+                class="ph ph-phone"
+                style="
+                  position: absolute;
+                  left: 11px;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  color: var(--t3);
+                  font-size: 15px;
+                  pointer-events: none;
+                "
+              ></i>
+              <input
+                class="finput"
+                id="nTelefono"
+                placeholder="300 000 0000 o +57 3000000000"
+                style="padding-left: 36px"
+                title="Puedes escribir el número separado o completo con código país"
+              />
+            </div>
           </div>
           <div
             style="
@@ -182,7 +194,7 @@
               font-family: var(--mono);
             "
           >
-            Incluye código de país · Ej: +57 310 555 1234
+            Se normaliza automáticamente. Acepta número pegado o separado.
           </div>
         </div>
 
@@ -216,13 +228,6 @@
             "
           ></div>
           <div class="flex" style="gap: 8px">
-            <button
-              class="btn btn-outline btn-sm"
-              onclick="notifProbarTodos()"
-              id="btnProbarCanales"
-            >
-              <i class="ph ph-broadcast"></i> Probar todos
-            </button>
             <button
               class="btn btn-primary"
               onclick="notifEnviar()"

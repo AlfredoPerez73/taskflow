@@ -28,6 +28,7 @@ function _hcColores() {
     document.documentElement.getAttribute("data-tema") === "claro";
   return {
     bg: esClaro ? "#ffffff" : "#111113",
+    tooltipBg: esClaro ? "#ffffff" : "#141417",
     plot: esClaro ? "#f1f1f3" : "#18181b",
     txt: esClaro ? "#52525b" : "#a1a1aa",
     txth: esClaro ? "#09090b" : "#fafafa",
@@ -50,12 +51,19 @@ function _hcBase() {
     chart: {
       backgroundColor: "transparent",
       style: { fontFamily: "Inter, sans-serif" },
+      spacingTop: 10,
+      spacingRight: 8,
+      spacingLeft: 8,
+      spacingBottom: 8,
     },
     title: { text: "" },
     credits: { enabled: false },
     legend: {
-      itemStyle: { color: c.txt, fontSize: "11px", fontWeight: "400" },
+      itemStyle: { color: c.txt, fontSize: "11px", fontWeight: "500" },
       itemHoverStyle: { color: c.txth },
+      symbolRadius: 99,
+      symbolHeight: 10,
+      symbolWidth: 10,
     },
     xAxis: {
       labels: { style: { color: c.txt, fontSize: "11px" } },
@@ -68,13 +76,19 @@ function _hcBase() {
       title: { text: "" },
     },
     tooltip: {
-      backgroundColor: c.bg,
+      backgroundColor: c.tooltipBg,
       borderColor: c.borde,
-      borderRadius: 8,
+      borderRadius: 10,
       style: { color: c.txth, fontSize: "12px" },
-      shadow: false,
+      shadow: true,
+      padding: 10,
     },
-    plotOptions: { series: { animation: { duration: 500 } } },
+    plotOptions: {
+      series: {
+        animation: { duration: 500 },
+        states: { inactive: { opacity: 1 } },
+      },
+    },
     colors: c.serie,
   };
 }
@@ -286,13 +300,19 @@ function _renderizarGraficos(m) {
     chart: { ..._hcBase().chart, type: "pie" },
     plotOptions: {
       pie: {
-        innerSize: "55%",
+        innerSize: "68%",
         borderWidth: 0,
-        borderRadius: 4,
+        borderRadius: 8,
+        slicedOffset: 2,
         dataLabels: {
           enabled: true,
-          distance: 12,
-          style: { fontSize: "11px", color: c.txt, fontWeight: "400" },
+          distance: 10,
+          connectorWidth: 1,
+          connectorColor: c.borde,
+          style: { fontSize: "10px", color: c.txt, fontWeight: "500", textOutline: "none" },
+          formatter() {
+            return `${this.point.name}: ${this.y}`;
+          },
         },
         showInLegend: false,
       },
@@ -321,7 +341,13 @@ function _renderizarGraficos(m) {
     xAxis: { categories: prioEntradas.map(([k]) => k), ..._hcBase().xAxis },
     yAxis: { ..._hcBase().yAxis, allowDecimals: false },
     plotOptions: {
-      bar: { borderRadius: 4, borderWidth: 0, colorByPoint: true },
+      bar: {
+        borderRadius: 6,
+        borderWidth: 0,
+        colorByPoint: true,
+        pointPadding: 0.08,
+        groupPadding: 0.08,
+      },
     },
     colors: prioEntradas.map(([k]) => prioColores[k] || "#6366f1"),
     legend: { enabled: false },
@@ -342,10 +368,17 @@ function _renderizarGraficos(m) {
     yAxis: { ..._hcBase().yAxis, allowDecimals: false },
     plotOptions: {
       area: {
-        fillOpacity: 0.15,
-        lineWidth: 2,
+        fillOpacity: 0.2,
+        lineWidth: 3,
         borderRadius: 0,
-        marker: { enabled: vel.length <= 8, radius: 4, symbol: "circle" },
+        marker: {
+          enabled: vel.length <= 10,
+          radius: 4,
+          symbol: "circle",
+          lineWidth: 2,
+          lineColor: "#6366f1",
+          fillColor: c.bg,
+        },
       },
     },
     legend: { enabled: false },
@@ -368,7 +401,13 @@ function _renderizarGraficos(m) {
     xAxis: { categories: tipoEntradas.map(([k]) => k), ..._hcBase().xAxis },
     yAxis: { ..._hcBase().yAxis, allowDecimals: false },
     plotOptions: {
-      column: { borderRadius: 4, borderWidth: 0, colorByPoint: true },
+      column: {
+        borderRadius: 6,
+        borderWidth: 0,
+        colorByPoint: true,
+        pointPadding: 0.12,
+        groupPadding: 0.1,
+      },
     },
     colors: tipoEntradas.map(([k]) => tipoColores[k] || "#6366f1"),
     legend: { enabled: false },
@@ -397,7 +436,13 @@ function _renderizarGraficos(m) {
     xAxis: { categories: equipoData.map((d) => d.name), ..._hcBase().xAxis },
     yAxis: { ..._hcBase().yAxis, allowDecimals: false },
     plotOptions: {
-      bar: { borderRadius: 4, borderWidth: 0, colorByPoint: false },
+      bar: {
+        borderRadius: 6,
+        borderWidth: 0,
+        colorByPoint: false,
+        pointPadding: 0.08,
+        groupPadding: 0.08,
+      },
     },
     colors: ["#6366f1"],
     legend: { enabled: false },

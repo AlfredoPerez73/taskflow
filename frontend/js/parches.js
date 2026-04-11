@@ -120,20 +120,9 @@ window.cargarNotificaciones = async function () {
   // Llamar la función original
   if (_cargarNotificacionesOrig) await _cargarNotificacionesOrig();
 
-  // Inyectar botón "Enviar notificación" para PM y Admin
+  // Mantener una sola UX de envío (panel inline ya existente)
   const rol = S?.usuario?.rol;
   if (rol === "ADMIN" || rol === "PROJECT_MANAGER") {
-    const head = document.querySelector(".pantalla.activa .page-head .flex");
-    if (head && !document.getElementById("btnEnviarNotifExt")) {
-      const btn = document.createElement("button");
-      btn.id = "btnEnviarNotifExt";
-      btn.className = "btn btn-primary btn-sm";
-      btn.innerHTML =
-        '<i class="ph ph-paper-plane-right"></i> Enviar notificación';
-      btn.onclick = () => abrirModalNotifExterna();
-      head.prepend(btn);
-    }
-
     // Inyectar sección de contacto externo en panel de preferencias
     _inyectarPanelContacto();
   }
